@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import shaderProfileManager from '../core/ShaderProfileManager.js';
+import BioShader from '../shaders/BioShader.js';
 import { COLORS } from '../data/Colors.js';
 
 /**
@@ -611,11 +612,10 @@ class Nucleus extends BaseBuilding {
         this.geometryLOD0 = this.createRoundedTopBoxGeometry(width, height, depth, 0.4, 16);
         this.geometryLOD1 = this.createRoundedTopBoxGeometry(width, height, depth, 0.3, 8);
         
-        // Use shader profile manager to create material
-        const material = shaderProfileManager.createMaterial();
-        material.normalMap = this.normalTexture;
-        material.roughnessMap = this.roughnessTexture;
-        material.normalScale.set(1.5, 1.5); // Normal map intensity
+        // Use BioShader for animated pulsing nucleus (B1)
+        const material = new BioShader(false, new THREE.Vector3(1, 2, 1).normalize());
+        material.uniforms.baseColor.value.setHex(0xffffff);  // White nucleus
+        material.setPulse(0.015, 0.85, Math.random() * Math.PI * 2, 0.35, 0.12);
         
         // Store material for damage feedback
         this.baseMaterial = material;
@@ -867,11 +867,11 @@ class Nucleus extends BaseBuilding {
             if (this.mesh.material) {
                 this.mesh.material.dispose();
             }
-            this.mesh.material = shaderProfileManager.createMaterial();
-            this.mesh.material.normalMap = this.normalTexture;
-            this.mesh.material.roughnessMap = this.roughnessTexture;
-            this.mesh.material.normalScale.set(1.5, 1.5);
-            console.log(`[Nucleus] Updated material to profile: ${shaderProfileManager.getCurrentProfileId()}`);
+            const newMaterial = new BioShader(false, new THREE.Vector3(1, 2, 1).normalize());
+            newMaterial.uniforms.baseColor.value.setHex(0xffffff);
+            newMaterial.setPulse(0.015, 0.85, Math.random() * Math.PI * 2, 0.35, 0.12);
+            this.mesh.material = newMaterial;
+            console.log(`[Nucleus] Updated material with BioShader + pulse`);
         }
     }
 

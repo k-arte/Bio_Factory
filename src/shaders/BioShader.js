@@ -1,20 +1,41 @@
 import * as THREE from 'three';
 
 const vertexShader = `
+uniform float uTime;
+uniform float uPulseAmp;
+uniform float uPulseSpeed;
+uniform float uPulsePhase;
+uniform float uTopMaskH;
+uniform float uTopSmooth;
 varying vec3 vNormal;
 varying vec3 vWorldPos;
-uniform float uTime;
+
+float beat(float t) {
+    float s = fract(t);
+    return pow(s, 6.0) * exp(-3.0 * s);
+}
 
 void main() {
-    // Normal in view space for stable rim calculation
+    vec3 pos = position;
+    vec3 nrm = normalize(normalMatrix * normal);
+    
+    float y = pos.y;
+    float topMask = smoothstep(uTopMaskH - uTopSmooth, uTopMaskH + uTopSmooth, y);
+    
+    float t = uTime * uPulseSpeed + uPulsePhase;
+    float p = beat(fract(t));
+    p = smoothstep(0.0, 0.35, p);
+    float amp = uPulseAmp * topMask * p;
+    
+    float micro = sin(dot(pos.xz, vec2(8.3, 6.7)) + uTime * 3.7) * 0.15;
+    amp *= (1.0 + micro * 0.25);
+    
+    pos += normal * amp;
+    
     vNormal = normalize(normalMatrix * normal);
-    
-    // Breathing effect with time
-    vec3 breathedPosition = position * (0.97 + 0.03 * sin(uTime * 2.0));
-    vec4 worldPos = modelMatrix * vec4(breathedPosition, 1.0);
-    vWorldPos = worldPos.xyz;
-    
-    gl_Position = projectionMatrix * viewMatrix * worldPos;
+    vec4 world = modelMatrix * vec4(pos, 1.0);
+    vWorldPos = world.xyz;
+    gl_Position = projectionMatrix * viewMatrix * world;
 }
 `;
 
@@ -78,7 +99,12 @@ class BioShader extends THREE.ShaderMaterial {
             uniforms: {
                 baseColor: { value: isGrid ? new THREE.Color(0x330505) : new THREE.Color(0x2a0505) },
                 uTime: { value: 0 },
-                uKeyLightDir: { value: new THREE.Vector3(keyLightDir.x, keyLightDir.y, keyLightDir.z) }
+                uKeyLightDir: { value: new THREE.Vector3(keyLightDir.x, keyLightDir.y, keyLightDir.z) },
+                uPulseAmp: { value: 0.0 },
+                uPulseSpeed: { value: 0.85 },
+                uPulsePhase: { value: 0.0 },
+                uTopMaskH: { value: 0.35 },
+                uTopSmooth: { value: 0.12 }
             },
             vertexShader,
             fragmentShader,
@@ -93,6 +119,14 @@ class BioShader extends THREE.ShaderMaterial {
     
     setKeyLightDir(dir) {
         this.uniforms.uKeyLightDir.value.copy(dir);
+    }
+    
+    setPulse(amp = 0.015, speed = 0.85, phase = 0, topMaskH = 0.35, topSmooth = 0.12) {
+        this.uniforms.uPulseAmp.value = amp;
+        this.uniforms.uPulseSpeed.value = speed;
+        this.uniforms.uPulsePhase.value = phase;
+        this.uniforms.uTopMaskH.value = topMaskH;
+        this.uniforms.uTopSmooth.value = topSmooth;
     }
 }
 

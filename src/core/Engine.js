@@ -132,6 +132,7 @@ class Engine {
         this.gridCursor = null;
         this.selectionOverlayGroup = null; // Selection visualization group
         this.bioShaderMaterial = null;
+        this.edgeFogRing = null;  // Radial edge fog ring (A2)
         
         // Asset management system
         this.assetManager = new AssetManager();
@@ -162,7 +163,7 @@ class Engine {
         
         // Background color - slightly warmer for better mood
         this.scene.background = new THREE.Color(0x0a1722);
-        this.scene.fog = new THREE.Fog(0x0a1722, 90, 140);
+        this.scene.fog = new THREE.FogExp2(0x0a1722, 0.015);  // Exponential fog for depth (A1)
         
         // 1) Soft ambient fill with hemisphere light (warm top, dark red bottom reflection)
         const hemi = new THREE.HemisphereLight(0xffead6, 0x1a0b0b, 0.55);
@@ -288,6 +289,14 @@ class Engine {
             //     console.error('[Engine] ERROR creating UIManager:', e);
             // }
 
+            // Create edge fog ring (radial falloff at horizon)
+            try {
+                this.createEdgeFogRing();
+                console.log('[Engine] Edge fog ring created');
+            } catch (e) {
+                console.error('[Engine] ERROR creating edge fog ring:', e);
+            }
+            
             // Create particle system for atmosphere
             try {
                 this.createParticleSystem();
@@ -439,6 +448,50 @@ class Engine {
             this.particleVelocities[i + 1] = (Math.random() - 0.5) * 0.05; // vy
             this.particleVelocities[i + 2] = (Math.random() - 0.5) * 0.1; // vz
         }
+    }
+
+    createEdgeFogRing() {
+        // Radial fog falloff at horizon (A2: edge fog ring)
+        const size = 180;
+        const geo = new THREE.CircleGeometry(size, 64);
+        const fogColor = new THREE.Color(0x0a1722);
+        
+        const mat = new THREE.ShaderMaterial({
+            transparent: true,
+            depthWrite: false,
+            uniforms: {
+                uColor: { value: fogColor },
+                uInner: { value: 0.55 },
+                uOuter: { value: 0.95 },
+                uStrength: { value: 0.85 }
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                void main(){
+                    vUv = uv;
+                    vec4 wPos = modelMatrix * vec4(position,1.0);
+                    gl_Position = projectionMatrix * viewMatrix * wPos;
+                }
+            `,
+            fragmentShader: `
+                varying vec2 vUv;
+                uniform vec3 uColor;
+                uniform float uInner, uOuter, uStrength;
+                void main(){
+                    vec2 p = (vUv - 0.5) * 2.0;
+                    float r = length(p);
+                    float a = smoothstep(uInner, uOuter, r) * uStrength;
+                    if(a <= 0.001) discard;
+                    gl_FragColor = vec4(uColor, a);
+                }
+            `
+        });
+        
+        this.edgeFogRing = new THREE.Mesh(geo, mat);
+        this.edgeFogRing.rotation.x = -Math.PI / 2;
+        this.edgeFogRing.renderOrder = 1;
+        this.edgeFogRing.frustumCulled = false;
+        this.scene.add(this.edgeFogRing);
     }
 
     createGridCursor() {
@@ -901,6 +954,21 @@ class Engine {
         // Update RTS camera
         if (this.rtsCamera) {
             this.rtsCamera.update();
+        }
+        
+        // Adapt fog density to zoom (closer = slightly denser)
+        if (this.scene.fog && this.scene.fog.isFogExp2 && this.rtsCamera) {
+            const base = 0.013;
+            const zoomK = THREE.MathUtils.clamp(this.rtsCamera.currentZoom / 30, 0.7, 1.4);
+            this.scene.fog.density = base * zoomK;
+        }
+        
+        // Update edge fog ring position and params
+        if (this.edgeFogRing && this.rtsCamera) {
+            this.edgeFogRing.position.set(this.rtsCamera.currentPan.x, 0.008, this.rtsCamera.currentPan.z);
+            const mat = this.edgeFogRing.material;
+            mat.uniforms.uInner.value = THREE.MathUtils.lerp(0.58, 0.52, (this.rtsCamera.currentZoom - 10) / 50);
+            mat.uniforms.uStrength.value = THREE.MathUtils.lerp(0.78, 0.9, (this.rtsCamera.currentZoom - 10) / 50);
         }
         
         // Update BioShader time
