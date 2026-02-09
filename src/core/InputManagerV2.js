@@ -329,12 +329,23 @@ class InputManagerV2 {
 
         // ACTUALLY PLACE THE BUILDING via PlacementManager
         if (this.placementManager) {
-            if (this.selectedBuildingType === 'extractor') {
+            // Support both BioDatabase IDs (like 'BLD_EXTRACTOR') and UI types (like 'extractor')
+            const isBioDatabaseId = this.selectedBuildingType.startsWith('BLD_');
+            
+            if (isBioDatabaseId) {
+                // Place by BioDatabase ID
+                this.placementManager.placeByDatabaseId(this.selectedBuildingType, gridX, gridZ);
+                console.log(`[InputManagerV2] ✓ Building ${this.selectedBuildingType} placed at [${gridX}, ${gridZ}]`);
+            } else if (this.selectedBuildingType === 'extractor') {
+                // Legacy: UI type-based placement
                 this.placementManager.placeExtractor(gridX, gridZ);
                 console.log(`[InputManagerV2] ✓ Extractor placed at [${gridX}, ${gridZ}]`);
             } else if (this.selectedBuildingType === 'storage') {
+                // Legacy: UI type-based placement
                 this.placementManager.placeStorage(gridX, gridZ);
                 console.log(`[InputManagerV2] ✓ Storage placed at [${gridX}, ${gridZ}]`);
+            } else {
+                console.warn(`[InputManagerV2] No handler for building type: ${this.selectedBuildingType}`);
             }
         } else {
             console.warn('[InputManagerV2] PlacementManager not available');

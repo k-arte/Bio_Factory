@@ -12,11 +12,11 @@ class Inventory {
         this.onResourceChange = null; // Callback: function(resourceType, newAmount)
         this.onBuildingChange = null; // Callback: function(buildingKey, newState)
         
-        // Resource inventory
+        // Resource inventory with starting amounts
         this.resources = {
-            glucose: { name: 'Glucose', amount: 0, icon: '🍯', unit: 'mg/dL' },
-            oxygen: { name: 'Oxygen', amount: 0, icon: '💨', unit: '%' },
-            atp: { name: 'ATP', amount: 0, icon: '⚡', unit: 'μmol' },
+            glucose: { name: 'Glucose', amount: 100, icon: '🍯', unit: 'mg/dL' },
+            oxygen: { name: 'Oxygen', amount: 100, icon: '💨', unit: '%' },
+            atp: { name: 'ATP', amount: 50, icon: '⚡', unit: 'μmol' },
             lactate: { name: 'Lactate', amount: 0, icon: '☒', unit: 'mmol' },
             lipid: { name: 'Lipid', amount: 0, icon: '◆', unit: 'mg/dL' }
         };
@@ -27,42 +27,70 @@ class Inventory {
 
     /**
      * Initialize building catalog from BioDatabase
-     * Maps database entries to UI building keys
+     * Maps database entries to UI building keys and also adds BioDatabase IDs as keys
      */
     _initializeBuildingsFromDatabase() {
         const buildings = {};
         
-        // Build mapping: key -> {name, cost, buildTime, ...}
+        // Legacy mapping: UI key -> BioDatabase ID (for backward compatibility)
         const BUILDING_MAP = {
-            'extractor': 'BLD_EXTRACTOR',
-            'vessel': null,  // Not in BioDatabase yet
-            'mitochondria': 'BLD_MITOCHONDRIA', 
-            'cytosol': null, // Not in BioDatabase
-            'storage': null, // Not in BioDatabase
-            'defender': null // Not in BioDatabase
+            'extractor': 'BLD_PERICYTE_EXTRACTOR',
+            'vessel': 'BLD_VESSEL',
+            'mitochondria': null, 
+            'cytosol': null,
+            'storage': 'BLD_STORAGE_MICRO',
+            'defender': null
         };
         
-        // First pass: read from BioDatabase
-        for (const [uiKey, dbId] of Object.entries(BUILDING_MAP)) {
-            if (!dbId) continue;
-            
-            const dbEntry = this.database.buildings?.find(b => b.id === dbId);
-            if (dbEntry) {
-                buildings[uiKey] = {
-                    name: dbEntry.name,
-                    type: uiKey,
-                    description: dbEntry.description,
-                    category: dbEntry.category || 'Building',
-                    icon: dbEntry.icon,
-                    hotkey: this._mapHotkey(uiKey),
-                    cost: dbEntry.cost || {},
-                    buildTime: dbEntry.buildTime || 10,
-                    dbEntry // Keep reference for future use
+        // Default costs for buildings if not specified in database
+        const DEFAULT_COSTS = {
+            'BLD_PERICYTE_EXTRACTOR': { glucose: 10 },
+            'BLD_ANABOLIC_CELL': { glucose: 15 },
+            'BLD_SPONGE_CELL': { glucose: 20 },
+            'BLD_RESOURCE_DIFFUSER': { glucose: 25 },
+            'BLD_STORAGE_MICRO': { glucose: 15 },
+            'BLD_VESSEL': { glucose: 5 },
+            'BLD_CARDIOCYTE_PUMP': { glucose: 30 }
+        };
+        
+        // First pass: Add all BioDatabase buildings with their IDs as keys
+        if (this.database.buildings && Array.isArray(this.database.buildings)) {
+            this.database.buildings.forEach((dbBuilding) => {
+                const buildingData = {
+                    name: dbBuilding.name,
+                    type: dbBuilding.id,
+                    databaseId: dbBuilding.id,
+                    description: dbBuilding.description || '',
+                    category: dbBuilding.category || 'Building',
+                    icon: dbBuilding.icon || '🏢',
+                    hotkey: '0',
+                    cost: dbBuilding.cost || DEFAULT_COSTS[dbBuilding.id] || { glucose: 10 },
+                    buildTime: dbBuilding.buildTime || 10,
+                    dbEntry: dbBuilding
                 };
+                
+                // Add with BioDatabase ID as key
+                buildings[dbBuilding.id] = buildingData;
+                
+                console.log(`[Inventory] Added BioDatabase building: ${dbBuilding.id} (${dbBuilding.name})`);
+            });
+        }
+        
+        // Second pass: Add backward compatibility keys (UI keys like 'extractor', 'storage')
+        for (const [uiKey, dbId] of Object.entries(BUILDING_MAP)) {
+            if (dbId && buildings[dbId]) {
+                // Point the UI key to the same building data as the database ID
+                // But only if not already defined
+                if (!buildings[uiKey]) {
+                    buildings[uiKey] = {
+                        ...buildings[dbId],
+                        type: uiKey // Override type to UI key for legacy compatibility
+                    };
+                }
             }
         }
         
-        // Second pass: add defaults for buildings not yet in database
+        // Third pass: add defaults for UI buildings not yet in database
         const defaults = {
             extractor: {
                 name: 'Extractor',

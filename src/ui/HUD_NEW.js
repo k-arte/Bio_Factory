@@ -1257,16 +1257,26 @@ class HUD {
         setTimeout(() => {
             const buildingCards = document.querySelectorAll('.building-card-in-panel');
             buildingCards.forEach((card, index) => {
-                // Track selected building for ALT+number assignment
-                card.addEventListener('click', () => {
+                // Regular click: Select building for placement on grid
+                card.addEventListener('click', (e) => {
+                    if (e.altKey) return; // Skip if ALT+click (handled separately)
+                    
                     // Clear previous selection
                     document.querySelectorAll('.building-card-in-panel').forEach(c => {
                         c.classList.remove('selected');
                     });
                     // Mark this one as selected
                     card.classList.add('selected');
-                    this.selectedBuildingForHotbar = card.dataset.buildingKey;
-                    console.log(`[HUD] Selected building for hotbar: ${this.selectedBuildingForHotbar}`);
+                    const buildingId = card.dataset.buildingKey;
+                    this.selectedBuildingForHotbar = buildingId;
+                    
+                    // SELECT FOR PLACEMENT: Pass BioDatabase ID to InputManager
+                    if (this.engine && this.engine.inputManager) {
+                        this.engine.inputManager.selectBuildingType(buildingId);
+                        console.log(`[HUD] Building ${buildingId} selected for placement on grid`);
+                    } else {
+                        console.warn('[HUD] InputManager not available');
+                    }
                 });
                 
                 // ALT+Click to assign to hotbar (find next available slot)
@@ -1277,7 +1287,7 @@ class HUD {
                     }
                 });
             });
-            console.log('[HUD] Building cards wired for hotbar assignment');
+            console.log('[HUD] Building cards wired for placement selection and hotbar assignment');
         }, 200);
         
         // HOTBAR ITEM INTERACTIONS

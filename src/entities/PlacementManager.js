@@ -313,6 +313,47 @@ class PlacementManager {
         return deconstructCount;
     }
 
+    /**
+     * Place a building by its BioDatabase ID
+     * Maps database IDs to appropriate placement methods
+     * @param {string} databaseId - BioDatabase building ID (e.g., 'BLD_PERICYTE_EXTRACTOR')
+     * @param {number} gridX - Grid X coordinate
+     * @param {number} gridZ - Grid Z coordinate
+     * @returns {Object|null} - Placed building or null if failed
+     */
+    placeByDatabaseId(databaseId, gridX, gridZ) {
+        // Map BioDatabase IDs to UI building type names
+        const databaseToUIMap = {
+            'BLD_PERICYTE_EXTRACTOR': 'extractor',
+            'BLD_ANABOLIC_CELL': 'storage',
+            'BLD_STORAGE_MICRO': 'storage',
+            'BLD_VESSEL': 'vessel',
+            'BLD_CARDIOCYTE_PUMP': 'storage', // Use storage as placeholder for pump
+            'BLD_SPONGE_CELL': 'storage',      // Use storage as placeholder for balancer
+            'BLD_RESOURCE_DIFFUSER': 'storage' // Use storage as placeholder for diffuser
+        };
+
+        const uiType = databaseToUIMap[databaseId];
+        
+        if (!uiType) {
+            console.warn(`[PlacementManager] Unknown BioDatabase ID: ${databaseId}`);
+            return null;
+        }
+
+        // Route to correct placement method based on UI type
+        if (uiType === 'extractor') {
+            return this.placeExtractor(gridX, gridZ);
+        } else if (uiType === 'storage') {
+            return this.placeStorage(gridX, gridZ);
+        } else if (uiType === 'vessel') {
+            // Default to horizontal vessel direction
+            return this.placeVessel(gridX, gridZ, 'right');
+        }
+
+        console.warn(`[PlacementManager] No placement handler for type: ${uiType}`);
+        return null;
+    }
+
     clear() {
         this.buildings.forEach(({ building }) => building.destroy());
         this.buildings.clear();
