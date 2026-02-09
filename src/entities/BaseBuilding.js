@@ -223,13 +223,12 @@ class BaseBuilding {
     }
 
     createMesh(geometry, color) {
-        const material = new THREE.MeshStandardMaterial({
-            color,
-            emissive: color,
-            emissiveIntensity: 0.3,
-            metalness: 0.5,
-            roughness: 0.3
-        });
+        // Use BioShader for all buildings (not just Nucleus)
+        const material = new BioShader(false, new THREE.Vector3(1, 2, 1).normalize());
+        material.uniforms.baseColor.value.setHex(color);
+        
+        // Apply building animation profile (moderate pulse + some stiffness)
+        applyAnimationProfile(material, 'building');
 
         const mesh = new THREE.Mesh(geometry, material);
         mesh.position.copy(this.position);

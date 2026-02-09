@@ -51,6 +51,11 @@ class PlacementManager {
         // Store construction cost for deconstruction refund
         extractor._buildingCost = { RES_GLUCOSE: 10 };
 
+        // Register animated material with engine for time updates
+        if (this.engine && extractor.mesh && extractor.mesh.material) {
+            this.engine.registerAnimatedMaterial(extractor.mesh.material);
+        }
+
         this.buildings.set(key, {
             type: this.buildingTypes.EXTRACTOR,
             building: extractor
@@ -81,6 +86,11 @@ class PlacementManager {
 
         // Store construction cost for deconstruction refund
         storage._buildingCost = { RES_GLUCOSE: 15 };
+
+        // Register animated material with engine for time updates
+        if (this.engine && storage.mesh && storage.mesh.material) {
+            this.engine.registerAnimatedMaterial(storage.mesh.material);
+        }
 
         this.buildings.set(key, {
             type: this.buildingTypes.STORAGE,
