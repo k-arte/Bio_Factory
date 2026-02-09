@@ -1,428 +1,605 @@
-# Bio-Factory
+# Bio-Factory: Pathophysiological Systems Simulation
 
-A Three.js-based biological factory simulation game with advanced PBR wet flesh rendering and quality-optimized graphics.
+An educational interactive simulation demonstrating cellular metabolism, resource transport, and biological system dynamics through the lens of a factory/RTS game mechanic.
 
-## 🎮 Current Status (February 2026)
-
-**Focus**: Advanced visual rendering and environment creation. The game features a procedurally generated wet flesh terrain with realistic material properties and performance-optimized rendering profiles.
+**Not a game.** A teaching tool disguised as one.
 
 ---
 
-## 🎨 Visual Features
+## 🎯 Core Vision
 
-### Wet Flesh Rendering System ✅
-The ground renders as biological wet tissue with multiple visual layers:
+### What This Is
+Bio-Factory models a biological organ's internal *chemical factory* using three parallel systems:
+1. **Physical 3D visualization** (Three.js) showing spatial layout and material flow
+2. **Procedural biome generation** creating realistic tissue structures  
+3. **Data-driven rule system** encoding metabolic/biological principles in JSON
 
-- **Base Color**: Blood red (#8a0d0d) 
-- **Large Grain Texture**: 32×32 pixel blocks with random variation
-- **Directional Cracks**: 15 streak lines creating natural fissures
-- **Glossy Wet Spots**: 50 bright spots simulating moisture/shine
-- **Normal Maps**: Surface detail for microroughness
-- **Emissive Glow**: Internal biological glow (#441111 at variable intensity)
+### Educational Purpose
+Students and AI systems learn:
+- How data-driven architecture decouples rules from engine
+- Metabolic pathways as resource conversion chains
+- Cellular structures as functional entities with health/state
+- Event-driven progression systems for unlock mechanics
+- Separation of concerns: rendering vs. simulation vs. data
 
-**Implementation**: Procedural canvas-based texture generation in `src/world/Grid.js`
+### Design Principles
+1. **Biological Accuracy Over Game Balance**
+   - Glucose → ATP conversion reflects real efficiency ratios
+   - Oxygen requirements match aerobic respiration pathways
+   - Tissue damage cascades model pathophysiological response
+   
+2. **Data Precedes Code**
+   - `src/data/BioDatabase.js` is the single source of truth
+   - Game engine knows nothing about "Glucose" or "Mitochondria"
+   - All rules are JSON; no hardcoding of mechanics
 
-### Quality Profiles ✅
-Three rendering tiers for performance optimization:
+3. **Generic, Introspective Engine**
+   - Three.js renderer is resource-agnostic
+   - Progression system is condition-agnostic
+   - UI reads from JSON; doesn't embed logic
 
-| Profile | Roughness | Emissive | Best For |
-|---------|-----------|----------|----------|
-| **HIGH** | 0.35 | 0.3 | Desktop/High-end devices |
-| **MEDIUM** | 0.5 | 0.2 | Mobile/Balanced scenes |
-| **LOW** | 0.7 | 0.0 | Low-end devices/Large scenes |
+---
 
-All profiles use **MeshStandardMaterial** for reliable rendering across platforms.
+## 🏗️ Architectural Philosophy
 
-**Usage**:
-```javascript
-shaderProfileManager.setProfile('MEDIUM');
-grid.updateGroundMaterial();
+### The Contract
+```
+BioDatabase (JSON) 
+  ↓ (source of all game mechanics)
+Engine (generic, data-agnostic)
+  ↓ (applies rules without knowing domain)
+Visual Feedback + Player Interaction
+  ↓ (back to data)
+Events → Progression → Persist
 ```
 
-**Files**: `src/core/ShaderProfileManager.js`
+### Why This Matters
+- **Changeability**: Rebalance the entire game by editing one JSON file
+- **Testability**: Rules are data, not hidden in code logic
+- **Reusability**: The engine could simulate any domain with different JSON
+- **Maintainability**: No duplicate code describing the same rule twice
+- **Extensibility**: New features extend the schema, not the engine
 
-### Lighting System ✅
-Optimized three-light setup for biological realism:
+### Core Files Architecture
 
-- **Ambient Light**: 1.2 intensity (primary illumination)
-- **Key Light**: Warm #ffe4cc at 0.8 intensity (form definition)
-- **Rim Light**: White at 0.4 intensity (edge separation)
-
-No hard shadows—soft natural lighting emphasizes wet flesh appearance.
-
-**Files**: `src/core/Engine.js` setupScene()
-
-### Grid System ✅
-- **Size**: 50×50 cells
-- **Cell Size**: 1.0 unit each
-- **Merged Geometry**: Single optimized mesh for 2,500 cells
-- **Terrain Types**: Endothelium (buildable), Calcified (blocked), Capillary (resource zones)
-- **Procedural Generation**: 70% buildable, 15% resources, 15% blocked
-
-**Files**: `src/world/Grid.js`
-
-### RTS Camera ✅
-- **Pan**: Middle mouse button drag for intuitive map navigation
-- **Zoom**: Mouse wheel for level adjustment
-- **View**: Isometric-like perspective optimized for strategy gameplay
-- **Smooth Damping**: Camera movements use velocity-based smoothing
-
-**Files**: `src/core/Engine.js` RTSCamera class
+| Folder | Responsibility | Knows About |
+|--------|-----------------|-----------|
+| `src/core/` | Rendering loop, camera, input, events | Canvas, mouse/keyboard, 3D objects |
+| `src/systems/` | Resource pooling, progression, persistence | Events, conditions, statistics |
+| `src/entities/` | Building placement, vessel networking, transport | Grid coordinates, connectivity |
+| `src/ui/` | Display layers, HUD panels, inventory state | DOM, colors, formatting only |
+| `src/data/` | **JSON game rules** (singular source) | What glucose IS, how ATP works |
+| `src/world/` | Terrain, structures, procedural generation | Biome layouts, tissue distribution |
 
 ---
 
-## 🛠️ Technology Stack
+## 📊 What Exists (Status & Completeness)
 
-- **Three.js r182**: 3D rendering engine
-- **Vite 7.3.1**: Fast build tool and dev server (hot reload)
-- **ES6 Modules**: Modern JavaScript architecture
-- **Canvas Textures**: Procedural texture generation
-- **MeshStandardMaterial**: PBR-compatible rendering
+### ✅ FULLY IMPLEMENTED
 
----
+**Rendering Pipeline**
+- Three.js scene with wet flesh material (red, emissive, normal-mapped)
+- Quality profile system (HIGH/MEDIUM/LOW) for performance scaling
+- Proper tone mapping (sRGB + ACES Filmic)
+- Grid overlay with cyan lines and cell highlighting
+- RTS camera with smooth pan/zoom
 
-## 📁 Project Structure
+**Input System (InputManagerV2)**
+- Mouse raycasting to grid cells
+- Building selection via hotbar (1-6 keys)
+- Ghost mesh preview for placement
+- Terrain inspection on hover
 
-```
-src/
-├── core/
-│   ├── Engine.js              # Main engine, lighting, camera
-│   ├── InputManagerV2.js      # Input handling
-│   ├── ShaderProfileManager.js # Quality profile management
-│   └── AssetManager.js         # Asset loading
-├── world/
-│   ├── Grid.js                # Terrain, wet flesh texture generation
-│   └── ResourceManager.js      # Resource system
-├── entities/
-│   ├── BaseBuilding.js         # Building base class (Nucleus)
-│   ├── PlacementManager.js     # Building placement system
-│   └── VesselSystemV2.js      # Vessel/pipe network
-├── ui/
-│   ├── HUD_NEW.js            # Main HUD interface
-│   ├── Inventory.js          # Resource display
-│   └── Hotbar.js             # Quick action bar
-├── shaders/
-│   └── BioShader.js          # Custom shader materials
-├── data/
-│   ├── Colors.js             # Centralized color constants
-│   └── BioDatabase.js        # Biological data definitions
-└── main.js                    # Entry point
-```
+**Building Placement (PlacementManager)**
+- Place extractors (1×1), storage (1×1), nucleus (5×5) buildings
+- Event emission on placement → triggers progression checks
+- Collision detection and occupied cell tracking
 
----
+**Resource System (ResourceManager)**
+- Mesh pooling for performance (~15 per resource type, 50 limit)
+- Event emitters for production/consumption
+- Data-driven shape/color from BioDatabase physics
+- Sprites: sphere, cube, tetrahedron, octahedron, icosahedron
 
-## 🚀 Quick Start
+**Progression Framework (ProgressionManager)**
+- Event-driven unlock system (no polling, O(1) per event)
+- Listener maps for efficient condition checking
+- Stat tracking: `total_energy_produced`, `buildings_built`, `playtime_seconds`
+- Persistence to localStorage via SaveManager (auto-save every 30s)
 
-```bash
-# Install dependencies
-npm install
+**Map Generation (MapGenerator)**
+- Procedural biome layout (2×2 grid: ENDOTHELIUM / CYTOPLASM)
+- Structure placement respecting unlock conditions
+- Terrain type assignment (buildable, blocked, resource zones)
 
-# Start dev server
-npm run dev
+**UI Subsystem (HUD_NEW)**
+- Top bar: Grid coordinates, terrain info, building hover details
+- Hotbar: 6 buildings (1-6 hotkeys) with affordability tracking
+- Inventory: Resource display, building catalog
+- Biomarker monitor: Real-time health sparklines (WBC, pH, Glucose, O₂)
+- Guide panel: Searchable database of entries with unlock hints
+- Settings, diagnostics, draft sections
 
-# Server runs on http://localhost:5173/
-```
-
-Hot reload enabled—changes save instantly in browser.
+**Data Integrity**
+- Single `BioDatabase.js` (542 lines) as source of truth
+- Schema includes: resources, buildings, structures, unlock_conditions, alt_recipes (framework), aoe_emitters (framework), systemic_modifiers (framework)
+- All costs/properties queried from JSON, not hardcoded
 
 ---
 
-## 🎯 Recent Changes (Feb 2026)
+### 🟡 PARTIALLY IMPLEMENTED (Prototype)
 
-### Visual Polish Phase
-- ✅ Centralized color management (`src/data/Colors.js`)
-- ✅ Rounded corner geometry for nucleus buildings
-- ✅ Large grain texture (32×32 blocks) for organic feel
-- ✅ Directional crack system (15 streak lines)
-- ✅ Wet spot gloss layer (50 bright spots)
-- ✅ Normal map generation for surface detail
-- ✅ Quality profile system (HIGH/MEDIUM/LOW)
-- ✅ Proper lighting (ambient + key + rim)
-- ✅ sRGB color space + ACES tone mapping
+**Alternative Recipes (Alternate Crafting Paths)**
+- JSON schema ready: `resources[].alt_recipes[]` with `unlock_condition`
+- Mechanism: Check condition in ProgressionManager
+- **Missing**: UI to display recipes, crafting queue, resource conversion flow
 
-### Fixes Applied
-- Ground visibility (DoubleSide rendering)
-- Material complexity reduced to MeshStandardMaterial
-- Emissive intensity adjusted for biological glow
-- Normal scale optimized (0.4 for subtle detail)
-- Light intensity balanced for visibility
+**AoE Emitters (Area Effects)**
+- JSON schema ready: `buildings[].aoe_emitters[]` with radius, effect type
+- Mechanism: Framework for applying effects to cells in range
+- **Missing**: Effect propagation, damage calculation, visual feedback
 
----
+**Systemic Modifiers (Organ-Wide Status Effects)**
+- JSON schema ready: `structures[].systemic_modifiers[]` (affect biomarker thresholds)
+- Concept: Broken structure → organism-wide penalty (e.g., SYS_TOXICITY +1)
+- **Missing**: Implementation, biomarker integration, visual indicators
 
-## 🎮 Current Gameplay State
-
-**Implemented**:
-- ✅ 50×50 grid rendering
-- ✅ RTS camera with pan/zoom
-- ✅ Building placement system
-- ✅ Nucleus building with rounded corners
-- ✅ Color-coded terrain visualization
-- ✅ Resource inventory display
-
-**In Progress**:
-- 🔄 Building functionality (extractors, processors)
-- 🔄 Resource flow system
-- 🔄 Vessel network connectivity
-- 🔄 Biomarker monitoring
-
-**Future**:
-- 🔲 Pathfinding for resource transport
-- 🔲 Disease/immune system simulation
-- 🔲 Progressive building unlocks
-- 🔲 Save/load system
+**Vessel/Transport System (Pipe Networks)**
+- JSON schema: vessels as entities connecting buildings
+- Classes: `VesselSystemV2` (placement UI), `TransportSystem` (flow simulation)
+- **Implemented**: Placement drag-to-place, auto-connection logic
+- **Missing**: Resource flow simulation, pathfinding, pressure balancing
 
 ---
 
-## 📊 Performance
+### ❌ NOT IMPLEMENTED (Planned Architecture)
 
-**Target**: 60 FPS on desktop, 30+ FPS on mobile
+**Real Gameplay Loop**
+- Buildings don't produce resources yet (extraction, processing pipelines)
+- Resources don't flow through vessels
+- No energy economy (ATP cost for building operations)
+- No damage/healing mechanics for structures
+- No disease/pathogen simulation
 
-**Optimizations**:
-- Single merged geometry (2,500 tiles = 1 draw call)
-- MeshStandardMaterial (standard PBR)
-- No real-time shadows on main lights
-- Procedural texture generation (no external assets)
-- Quality profile switching without reload
+**Balancing System**
+- No difficulty levels or dynamic scaling
+- No achievement/milestone tracking (framework exists)
+- No tutorial or guided progression
 
-**Tested On**:
-- Desktop (Chrome, Firefox)
-- Mobile (responsive canvas)
+**Persistence**
+- Save/load exists in SaveManager, not wired to UI
+- No auto-save on critical milestones
+- No undo/redo system
 
----
-
-## 🔧 Color System
-
-All colors centralized in `src/data/Colors.js`:
-- Cost: 30 Glucose
-- Build time: 15s
-- Attacks pathogens; deployable defensive unit
-- *Status*: Framework only; AI not implemented
-
-**Files**: `src/ui/Inventory.js`, `src/ui/Hotbar.js`, `src/entities/BaseBuilding.js`
+**Audio/Feedback**
+- No sound effects or music
+- No particle effects for production/consumption
+- No haptic feedback
 
 ---
 
-### 4. **Building Placement & Input** ✅
-- **Drag-to-place UI**: Mouse drag from hotbar → cell → preview with hologram
-- **Two-click confirmation**: Drag preview → left-click to confirm
-- **Resource affordability**: Buildings flash red if unaffordable
-- **Grid cursor**: Cyan circle shows current mouse position on grid
-- **Terrain inspection**: Hover text shows terrain type and coordinates
+## 🎮 How to Run
 
-**Status**: Input system fully coded; visual feedback ready (hologram preview structure created)
-
-**Files**: 
-- `src/core/InputManagerV2.js` - Drag-to-place logic & raycasting
-- `src/entities/VesselSystemV2.js` - Building placement handler
-- `src/ui/Hotbar.js` - Hotkey bindings (1-6)
-
----
-
-### 5. **User Interface (HUD)** ✅
-
-#### **Medical Glass Theme**
-- Cyan border accents (#00ffff)
-- Dark medical blue background (#001a2e)
-- Red alert highlights (#ff3333)
-- 5px backdrop blur for glass effect
-- Monospace fonts (Courier New) for authenticity
-
-#### **Top Status Bar**
-- Diagnostics button (not yet functional)
-- Global alerts (red marquee text at top) - WARNING box now static
-
-#### **Bottom-Right: Inventory Panel**
-- **Resources tab**: Current glucose, oxygen, ATP, lipid, lactate amounts
-- **Buildings tab**: Available structures with hotkeys, costs, descriptions
-- Color-coded by category (Extraction, Processing, Defense, Logistics)
-
-#### **Bottom-Left: Hotbar**
-- 6 quick-access building buttons (left column)
-- Hotkeys labeled: 1, 2, 3, 4, 5, 6
-- Visual feedback when selected (cyan glow)
-- Displays affordability (flashes red if too expensive)
-
-#### **Right-Side: Vitals Monitor**
-- Real-time health metric displays
-- Four biomarkers with sparkline graphs
-
-**Files**: `src/ui/HUD.js`, `src/ui/Hotbar.js`, `src/ui/Inventory.js`, `src/ui/BiomarkerMonitor.js`
-
----
-
-## 🔧 Color System
-
-All colors are centralized in [src/data/Colors.js](src/data/Colors.js):
-
-```javascript
-const COLORS = {
-  GROUND_PRIMARY: 0xFF6666,      // Blood red flesh
-  GROUND_EMIT: 0xFF5555,         // Dark red internal glow
-  GRID_LINES: 0x00FFFF,          // Cyan guidelines
-  GRID_LINES_ALT: 0x0099FF,      // Secondary grid color
-  PLACEMENT_VALID: 0x00FF88,     // Green preview
-  PLACEMENT_INVALID: 0xFF6666,   // Red invalid placement
-  // ... additional palette colors
-};
-```
-
-**Used in**: Grid rendering, material creation, UI feedback, visual asset generation.
-
----
-
-## 📁 Core Project Structure
-
-```
-Bio-Factory/
-├── public/
-│   └── index.html              # Entry HTML
-├── src/
-│   ├── main.js                 # Entry point (initializes Engine + Grid)
-│   ├── data/
-│   │   └── Colors.js           # Centralized color constants
-│   ├── core/
-│   │   ├── Engine.js           # Main loop, scene, camera, 3-light setup
-│   │   ├── ShaderProfileManager.js # Quality profiles (HIGH/MEDIUM/LOW)
-│   │   └── InputManager.js     # Input handling
-│   ├── world/
-│   │   ├── Grid.js             # 50×50 terrain, wet flesh texture
-│   │   └── ResourceManager.js  # Resource tracking
-│   ├── entities/
-│   │   ├── BaseBuilding.js
-│   │   ├── PlacementManager.js
-│   │   └── TransportSystem.js
-│   ├── ui/
-│   │   └── UIManager.js
-│   └── shaders/
-│       └── BioShader.js
-├── vite.config.js
-├── package.json
-└── README.md
-```
-
----
-
-## 🔍 Key Implementation Details
-
-### **Wet Flesh Texture Generation** (Grid.js)
-
-The ground texture is procedurally generated in real-time:
-
-1. **Base Color Map**: Canvas 512×512, filled with random grain blocks (32×32 pixels)
-2. **Roughness Map**: Darker areas for natural variation
-3. **Normal Map**: Derived from color variation, scaled to 0.4 for subtle detail
-4. **Crack System**: 15 directional lines creating fissures
-5. **Glossy Spots**: 50 bright wet spots for moisture appearance
-
-```javascript
-function createFleshTexture(size = 512) {
-  // Creates biological wet tissue appearance
-  // with procedural grain, cracks, and moisture
-}
-```
-
-### **Material System** (ShaderProfileManager.js)
-
-All three profiles use **MeshStandardMaterial** for reliable PBR rendering:
-
-```javascript
-HIGH: {
-  color: COLORS.GROUND_PRIMARY,
-  roughness: 0.35,
-  metalness: 0.0,
-  emissive: COLORS.GROUND_EMIT,
-  emissiveIntensity: 0.3
-}
-// MEDIUM and LOW profiles with increased roughness
-```
-
-### **Lighting Setup** (Engine.js)
-
-Three-light system optimized for wet biological appearance:
-
-```javascript
-// Ambient: Base illumination (1.2 intensity)
-const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
-
-// Key Light: Warm, directional fill (0.8 intensity, #ffe4cc)
-const keyLight = new THREE.DirectionalLight(0xffe4cc, 0.8);
-
-// Rim Light: Edge definition (0.4 intensity, white)
-const rimLight = new THREE.DirectionalLight(0xffffff, 0.4);
-```
-
-### **Tone Mapping Pipeline**
-
-- **Color Space**: sRGB output
-- **Algorithm**: ACESFilmicToneMapping
-- **Exposure**: 1.2 (prevents red clipping, stabilizes highlights)
-
----
-
-## ⚙️ Development
-
-### Running Locally
-
+### Prerequisites
 ```bash
 npm install
+```
+
+### Development Server
+```bash
 npm run dev
 ```
+Opens `http://localhost:5173` with hot module reload.
 
-Server runs on `http://localhost:5173/` with hot module reload.
-
-### Switching Quality Profiles
-
-```javascript
-import { ShaderProfileManager } from './src/core/ShaderProfileManager.js';
-
-shaderProfileManager.setProfile('MEDIUM');
-grid.updateGroundMaterial();  // Apply to ground
-```
-
-### Building for Production
-
+### Build for Production
 ```bash
 npm run build
 ```
-
 Outputs optimized bundle to `dist/`.
 
----
-
-## 🎯 Current Development Focus
-
-**Phase**: Advanced visual rendering and material systems
-
-**Completed**:
-- ✅ Procedural wet flesh texture generation
-- ✅ Quality profile system (HIGH/MEDIUM/LOW)
-- ✅ Proper 3-light setup with warm/cool balance
-- ✅ sRGB + ACES tone mapping pipeline
-- ✅ Normal map integration (0.4 scale)
-- ✅ Centralized color management
-- ✅ Git repository with public access
-
-**Next Steps**:
-- Building placement and interaction systems
-- Resource management framework
-- Game loop integration
-- Additional visual polish (particle effects, animations)
+### Browser DevTools
+```javascript
+// In console, access game state:
+engine.resourceManager        // Inspect active resources
+engine.progressionManager     // Check unlocked entries
+engine.mapGenerator           // View biome/structure data
+engine.placementManager       // List placed buildings
+```
 
 ---
 
-## 🔗 Repository
+## 📐 Data-Driven Development: Rules for AI Contributors
 
-**GitHub**: https://github.com/k-arte/Bio_Factory
+### The Golden Rule
+**If a game mechanic exists, it must be defined in `src/data/BioDatabase.js`.**
 
-**Status**: Public repository with full commit history and development logs.
+### Specific Rules
+
+#### 1. No Hardcoded Game Values
+**❌ WRONG:**
+```javascript
+if (buildingType === 'extractor' && resourceType === 'glucose') {
+  amount = 5;  // Hardcoded production
+}
+```
+
+**✅ RIGHT:**
+```javascript
+const dbEntry = BioDatabase.buildings.find(b => b.id === buildingId);
+const production = dbEntry.production[resourceType]; // Read from JSON
+```
+
+#### 2. No Duplicate System Definitions
+**❌ WRONG:**
+```javascript
+// In Inventory.js
+this.buildings = {
+  extractor: { cost: { glucose: 10 } }
+};
+
+// Also in PlacementManager.js
+const COST = { EXTRACTOR: { glucose: 10 } };  // Duplicate!
+```
+
+**✅ RIGHT:**
+```javascript
+// Single source, queried everywhere:
+const dbEntry = BioDatabase.buildings.find(b => b.id === 'BLD_EXTRACTOR');
+const cost = dbEntry.cost;  // Same reference, everywhere
+```
+
+#### 3. Extend Schema, Don't Patch Logic
+**❌ WRONG:**
+```javascript
+// Want to add fire resistance? Hardcode check:
+if (building.fireResistance > 0) { ... }
+```
+
+**✅ RIGHT:**
+```javascript
+// Add to BioDatabase:
+{
+  id: "BLD_EXTRACTOR",
+  name: "Extractor",
+  resistances: {
+    fire: 0.8,
+    cold: 0.3
+  }
+}
+// Then query it everywhere:
+const resistance = dbEntry.resistances[damageType] || 0;
+```
+
+#### 4. Events Must Flow Through Progression
+**❌ WRONG:**
+```javascript
+// Direct unlock:
+if (resourceProduced > 500) {
+  unlockedBuildings.push('BLD_MITOCHONDRIA');
+}
+```
+
+**✅ RIGHT:**
+```javascript
+// Fire event:
+resourceManager.onProduced('RES_ATP', 1);
+
+// Progression handles:
+onResourceProduced(resourceType, amount) {
+  this.stats.total_energy_produced += amount;
+  this._checkStatThreshold('total_energy_produced');  // Reads unlock_condition from JSON
+}
+```
+
+#### 5. No Side Effects in Getters
+**❌ WRONG:**
+```javascript
+getBuilding(id) {
+  const building = this.buildings[id];
+  building.timesAccessed++;  // Side effect!
+  return building;
+}
+```
+
+**✅ RIGHT:**
+```javascript
+getBuilding(id) {
+  return this.buildings[id];  // Pure function
+}
+
+// Tracking done in dedicated method:
+trackBuildingView(id) {
+  this.stats.buildingViewCount[id]++;
+}
+```
+
+#### 6. Data First, Then Implementation
+**When adding a feature:**
+1. Define it in BioDatabase (schema + values)
+2. Wire it to systems (events, checks, effects)
+3. Add UI to display it
+4. Test end-to-end flow
+
+**Never:**
+1. "Quick hardcode" thinking you'll add JSON later
+2. Implement without finalizing the data shape
 
 ---
 
-## 📜 License
+## 🔴 Current Technical Debt & Risks
 
-Open source - educational project for learning game development with Three.js and advanced rendering techniques.
+### CRITICAL (Breaking)
+
+**Risk 1: VesselSystem Ambiguity**
+- Two vessel classes exist: `VesselSystem` (auto-tiling) and `VesselSystemV2` (drag-to-place)
+- **Status**: Only VesselSystemV2 imported; VesselSystem is dead code (should be deleted)
+- **Impact**: Maintenance confusion, unclear which interface to use
+- **Mitigation**: Decide definitively; delete or consolidate
+- **Timeline**: Must resolve before vessel transport is implemented
+
+**Risk 2: Building Type Mapping**
+- Inventory.js maps UI keys (extractor, mitochondria) to DB IDs (BLD_EXTRACTOR, BLD_MITOCHONDRIA)
+- Partial mapping: Some buildings not yet in BioDatabase (vessel, cytosol, defender)
+- **Status**: Falls back to hardcoded defaults
+- **Impact**: If you edit Inventory costs, they diverge from JSON
+- **Mitigation**: Prioritize adding all buildings to BioDatabase
+- **Timeline**: Add 100% of buildings to schema before gameplay loop launch
+
+**Risk 3: SaveManager Integration Incomplete**
+- Auto-save fires every 30s but `saveGameState()` never actually called
+- No hook to trigger save on meaningful events (building placed, research completed)
+- **Status**: Call exists but no event connection
+- **Impact**: Player progress may not persist properly
+- **Mitigation**: Wire building placement and progression events to `saveGameState()`
+- **Timeline**: Test before any public release
+
+### HIGH (Architectural)
+
+**Risk 4: HUD_NEW God Class**
+- Single file: 1369 lines handling inventory, biomarkers, hotbar, guide, settings, progression, diagnostics
+- **Status**: Works but unmaintainable
+- **Impact**: Hard to test, extend, debug individual panels
+- **Mitigation**: Refactor into separate panel classes (HUDController + InventoryPanel, BiomarkerPanel, etc.)
+- **Timeline**: After core gameplay loop stabilizes
+
+**Risk 5: MapGenerator Called But Results Unused**
+- `mapGenerator.generateMap()` runs and creates structures
+- No visual representation or interaction yet (structures are in data, not scene)
+- **Status**: Generates data; doesn't affect player experience
+- **Impact**: Code-to-visualization gap; structures exist in logic but invisible
+- **Mitigation**: Implement structure meshes and add to scene
+- **Timeline**: Coordinate with building placement for visual consistency
+
+**Risk 6: No Resource Production Pipeline**
+- Buildings can be placed but don't produce/consume resources
+- ResourceManager exists but `resourceManager.getResource()` never called
+- **Status**: Framework complete, gameplay missing
+- **Impact**: Game is unplayable; factories don't work
+- **Mitigation**: Implement extractor production, transport flow, ATP consumption loop
+- **Timeline**: Core gameplay loop is next major milestone
 
 ---
 
-**Last Updated**: February 2026  
-**Development Status**: Early Alpha - Rendering foundation complete, gameplay systems in progress
+### MEDIUM (Design)
+
+**Risk 7: BioDatabase Schema Still Incomplete**
+- alt_recipes, aoe_emitters, systemic_modifiers defined but not implemented
+- Default values for buildings not in DB (fallback hardcodes)
+- **Status**: Growing toward full schema, currently ~70% coverage
+- **Impact**: Feature parity between code and data design incomplete
+- **Mitigation**: Evaluate cost of each feature; implement or remove from schema
+- **Timeline**: Stabilize schema before v1.0
+
+**Risk 8: No Performance Profiling**
+- No FPS monitoring or bottleneck identification
+- Three.js may hit limits with many resources/buildings
+- **Status**: Assumed working (quality profile system in place)
+- **Impact**: May discover performance wall unexpectedly
+- **Mitigation**: Add perf stats display; test with 500+ active resources
+- **Timeline**: Profile before mobile support
+
+**Risk 9: Event System Not Exhaustive**
+- Only ResourceManager and PlacementManager fire events
+- Missing: VesselPlace, StructureBreak, UnlockTriggered, ResearchStart
+- **Status**: Core events exist; supplementary events incomplete
+- **Impact**: Some progression conditions can't trigger without more events
+- **Mitigation**: Define event contract; ensure every game action fires relevant event
+- **Timeline**: Document and expand as features add
+
+---
+
+### LOW (Polish)
+
+**Risk 10: Guide Panel Incomplete**
+- Guide displays entries but doesn't differentiate locked vs unlocked visually
+- No tutorials or guided progression
+- **Status**: Searchable database works; narrative/onboarding missing
+- **Impact**: Players/students unclear on how to use system
+- **Mitigation**: Add tutorial missions and achievement milestones
+
+**Risk 11: Internationalization Not Planned**
+- All text hardcoded in English/Russian mixed
+- No i18n framework
+- **Status**: Not a priority for educational tool
+- **Impact**: Non-English speakers have reduced access
+- **Mitigation**: Document as English-only; revisit if global audience needed
+
+---
+
+## 🧬 Development Workflow
+
+### Adding a New Feature
+
+#### Example: "Introduce Calcium Resource"
+
+1. **Define in BioDatabase**
+   ```javascript
+   {
+     id: "RES_CALCIUM",
+     name: "Calcium",
+     icon: "🟫",
+     description: "Mineral compound for cell signaling",
+     physics: { viscosity: 1.0, diffusionRate: 0.4 },
+     ui_data: { shape: "CUBE", color: "#E0E0E0" }
+   }
+   ```
+
+2. **Inventory Auto-reads It**
+   ```javascript
+   // Inventory._initializeBuildingsFromDatabase() sees new resource
+   // ResourceManager._buildConfigFromDatabase() creates pool
+   // No code changes needed!
+   ```
+
+3. **Add to Building Costs (if needed)**
+   ```javascript
+   {
+     id: "BLD_CALCIUM_PUMP",
+     name: "Calcium Pump",
+     cost: { glucose: 50, calcium: 10 }  // Consumes calcium
+   }
+   ```
+
+4. **Wire Production Event**
+   ```javascript
+   // In extractor or transport system:
+   resourceManager.onProduced('RES_CALCIUM', 5);
+   // ProgressionManager automatically checks for calcium-based unlocks
+   ```
+
+5. **Test in Browser**
+   ```javascript
+   // Console:
+   engine.resourceManager.getResource('RES_CALCIUM', { x: 5, y: 0, z: 5 });
+   // Should create a cube-shaped resource at that position
+   ```
+
+---
+
+## 🔗 Architecture Diagrams
+
+### Event Flow
+```
+Player clicks "Place Extractor" at grid[10,15]
+  ↓
+InputManager detects click, validates placement
+  ↓
+PlacementManager.placeExtractor(10, 15)
+  ↓
+Creates Extractor mesh in scene
+  ↓
+Fires: placeExtractor.onPlaced("BLD_EXTRACTOR", "EXTRACTOR", 10, 15)
+  ↓
+ProgressionManager.onBuildingBuilt("BLD_EXTRACTOR")
+  ↓
+Increments stats.buildings_built
+  ↓
+Checks BioDatabase for unlocks with condition {
+  type: "STAT_THRESHOLD",
+  stat: "buildings_built",
+  value: 5
+}
+  ↓
+If buildings_built >= 5, trigger category-specific unlocks
+  ↓
+SaveManager.saveGameState() (auto-save loop)
+  ↓
+localStorage updated with unlocked_ids, stats
+```
+
+### Data Flow at Startup
+```
+main.js→Engine constructor
+  ├─ setupScene() + setupCamera()
+  ├─ initializeGridAndCamera(grid)
+  │   ├─ Create HUD (includes ProgressionManager, SaveManager)
+  │   ├─ Create InputManager
+  │   ├─ Create RTSCamera
+  │   └─ setupMouseTracking()
+  └─ initializeFactorySystems()
+      ├─ ResourceManager(scene)
+      │   └─ _buildConfigFromDatabase() reads shapes/colors from BioDatabase
+      ├─ Wire events: ResourceManager.onProduced() → ProgressionManager.onResourceProduced()
+      ├─ TransportSystem(grid, resourceManager)
+      ├─ PlacementManager(...)
+      ├─ Wire events: PlacementManager.onPlaced() → ProgressionManager.onBuildingBuilt()
+      └─ MapGenerator(grid, scene)
+          ├─ setProgressionManager() for unlock checks
+          └─ generateMap() returns structures, biomes, stats
+
+Result: All systems wired; JSON is source of truth; events flow to progression
+```
+
+---
+
+## 🔍 Testing the Architecture
+
+### Verify Data-Driven Design
+```javascript
+// In browser console:
+
+// 1. Check resource shapes are from JSON
+const cfg = engine.resourceManager.resourceConfigs['RES_ATP'];
+console.log(cfg.shape); // Should be 'icosahedron' if from DB
+
+// 2. Verify no hardcoded game logic
+// Search codebase: grep -r "glucose.*=.*5" src/
+// Should find only defaults, not gameplay logic
+
+// 3. Test event flow
+engine.resourceManager.onProduced('RES_GLUCOSE', 10);
+console.log(engine.progressionManager.stats.total_energy_produced); // Should be 10+
+
+// 4. Check persistence
+engine.saveManager.saveGameState({ unlocked_entries: ['BLD_MITOCHONDRIA'] });
+const saved = localStorage.getItem('bio_factory_save_v1');
+console.log(JSON.parse(saved).unlocked_entries); // ['BLD_MITOCHONDRIA']
+```
+
+---
+
+## 📚 References
+
+**World:**
+- Three.js Documentation: https://threejs.org/docs
+- Vite Bundler: https://vitejs.dev
+- Game Engine Architecture (Gregory): Resource pooling, event systems
+
+**Biology:**
+- Cellular respiration pathways (Lehninger biochemistry)
+- Tissue organization and homeostasis
+- Pathophysiology of organ dysfunction
+
+**Educational Design:**
+- Learning by simulation (Schank, Rieber)
+- Game-based learning mechanics (Koster, Lazzaro)
+
+---
+
+## 📝 License
+
+Educational, open-source. No restrictions on modification or redistribution for learning purposes.
+
+**Contributors**: Hiro (architecture, systems), Gemini-assisted development (frameworks, initial schemas)
+
+---
+
+## ✅ Checklist for Contributors
+
+Before submitting a pull request:
+
+- [ ] Feature added to BioDatabase first (JSON)
+- [ ] No hardcoded game values in code
+- [ ] Events wired to ProgressionManager if applicable
+- [ ] No duplicate system definitions
+- [ ] Inventory/UI reads from JSON, not local state
+- [ ] SaveManager can persist changes
+- [ ] Syntax checked: `node -c src/yourfile.js`
+- [ ] No console errors or warnings
+- [ ] Architectural philosophy maintained
+
+---
+
+**Last Updated**: February 9, 2026  
+**Status**: Early Alpha — Core architecture complete, gameplay loop in progress  
+**Node**: v18+ required, Three.js r182, Vite 7.3.1
