@@ -239,6 +239,29 @@ class BaseBuilding {
         return mesh;
     }
 
+    /**
+     * Create black outline for any mesh (toon effect)
+     * @param {THREE.Geometry|THREE.BufferGeometry} geometry - The geometry to create outline from
+     * @param {number} scale - Scale factor for outline (default 1.02 = 2% larger)
+     */
+    createOutlineForMesh(geometry, scale = 1.02) {
+        if (!this.mesh) return;
+
+        const outlineGeometry = geometry.clone();
+        const outlineMaterial = new THREE.MeshBasicMaterial({
+            color: COLORS.OUTLINE_BLACK,
+            side: THREE.BackSide,
+            wireframe: false
+        });
+
+        this.outlineMesh = new THREE.Mesh(outlineGeometry, outlineMaterial);
+        this.outlineMesh.position.copy(this.mesh.position);
+        this.outlineMesh.scale.set(scale, scale, scale);
+        this.outlineMesh.name = `Outline_${this.mesh.name || 'building'}`;
+
+        this.scene.add(this.outlineMesh);
+    }
+
     update(deltaTime) {
         // Override in subclasses
     }
@@ -246,6 +269,9 @@ class BaseBuilding {
     destroy() {
         if (this.mesh && this.scene) {
             this.scene.remove(this.mesh);
+        }
+        if (this.outlineMesh && this.scene) {
+            this.scene.remove(this.outlineMesh);
         }
         if (this.cellIndicator && this.scene) {
             this.scene.remove(this.cellIndicator);
@@ -283,6 +309,9 @@ class Extractor extends BaseBuilding {
         const geometry = new THREE.ConeGeometry(0.4, 0.8, 4);
         this.mesh = this.createMesh(geometry, COLORS.EXTRACTOR_COLOR); // Flesh red
         this.scene.add(this.mesh);
+        
+        // Create black outline for toon effect
+        this.createOutlineForMesh(geometry, 1.05);
     }
 
     /**
@@ -353,6 +382,9 @@ class Storage extends BaseBuilding {
         const geometry = new THREE.BoxGeometry(0.6, 0.6, 0.6);
         this.mesh = this.createMesh(geometry, 0x442288); // Deep purple/blue organelle
         this.scene.add(this.mesh);
+        
+        // Create black outline for toon effect
+        this.createOutlineForMesh(geometry, 1.04);
     }
 
     /**
@@ -432,6 +464,9 @@ class CatabolismCell extends BaseBuilding {
         this.mesh.userData.cellType = 'CATABOLIC';
         this.scene.add(this.mesh);
         
+        // Create black outline for toon effect
+        this.createOutlineForMesh(geometry, 1.03);
+        
         console.log(`[CatabolismCell] Created at [${gridX}, ${gridZ}]`);
     }
 
@@ -507,6 +542,9 @@ class AnabolismCell extends BaseBuilding {
         this.mesh = this.createMesh(geometry, 0x00BCD4);
         this.mesh.userData.cellType = 'ANABOLIC';
         this.scene.add(this.mesh);
+        
+        // Create black outline for toon effect
+        this.createOutlineForMesh(geometry, 1.03);
         
         console.log(`[AnabolismCell] Created at [${gridX}, ${gridZ}]`);
     }

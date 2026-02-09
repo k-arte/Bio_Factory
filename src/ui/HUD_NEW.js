@@ -1260,10 +1260,18 @@ class HUD {
         setTimeout(() => {
             const buildingCards = document.querySelectorAll('.building-card-in-panel');
             buildingCards.forEach((card, index) => {
-                // Regular click: Select building for placement on grid
+                // Handle clicks - regular or ALT
                 card.addEventListener('click', (e) => {
-                    if (e.altKey) return; // Skip if ALT+click (handled separately)
+                    e.stopPropagation();
                     
+                    // ALT+Click to assign to hotbar
+                    if (e.altKey) {
+                        e.preventDefault();
+                        this.assignBuildingToHotbar(card.dataset.buildingKey);
+                        return;
+                    }
+                    
+                    // Regular click: Select building for placement on grid
                     // Clear previous selection
                     document.querySelectorAll('.building-card-in-panel').forEach(c => {
                         c.classList.remove('selected');
@@ -1279,14 +1287,6 @@ class HUD {
                         console.log(`[HUD] Building ${buildingId} selected for placement on grid`);
                     } else {
                         console.warn('[HUD] InputManager not available');
-                    }
-                });
-                
-                // ALT+Click to assign to hotbar (find next available slot)
-                card.addEventListener('click', (e) => {
-                    if (e.altKey) {
-                        e.preventDefault();
-                        this.assignBuildingToHotbar(card.dataset.buildingKey);
                     }
                 });
             });

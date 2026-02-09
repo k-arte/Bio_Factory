@@ -351,11 +351,14 @@ class InputManagerV2 {
             console.warn('[InputManagerV2] PlacementManager not available');
         }
 
-        // Deselect after placing
+        // Deselect after placing - clear all UI state
         this.selectBuildingType(null);
         if (this.hotbar) {
             this.hotbar.deselectBuilding();
         }
+        
+        // Ensure ghost is hidden
+        this.hideGhost();
     }
 
     /**
