@@ -1,11 +1,12 @@
 import { Extractor, Storage, Nucleus } from './BaseBuilding.js';
 
 class PlacementManager {
-    constructor(grid, scene, resourceManager, transportSystem) {
+    constructor(grid, scene, resourceManager, transportSystem, engine = null) {
         this.grid = grid;
         this.scene = scene;
         this.resourceManager = resourceManager;
         this.transportSystem = transportSystem;
+        this.engine = engine;  // For registering animated materials
         
         // Event listener for building placement (fired after successful placement)
         this.onBuildingPlaced = null; // (buildingId, buildingType, gridX, gridZ) -> void
@@ -114,6 +115,11 @@ class PlacementManager {
         }
 
         const nucleus = new Nucleus(gridX, gridZ, this.grid, this.scene, this.resourceManager);
+
+        // Register animated material with engine (for continuous time updates)
+        if (this.engine && nucleus.mesh && nucleus.mesh.material) {
+            this.engine.registerAnimatedMaterial(nucleus.mesh.material);
+        }
 
         // Register all 5x5 cells as part of the nucleus
         for (let x = gridX; x < gridX + nucleusSize; x++) {

@@ -2,39 +2,73 @@ import * as THREE from 'three';
 
 const vertexShader = `
 uniform float uTime;
-uniform float uPulseAmp;
-uniform float uPulseSpeed;
-uniform float uPulsePhase;
-uniform float uTopMaskH;
-uniform float uTopSmooth;
+uniform float uPulseAmp;       // базовая амплитуда (0.00..0.03)
+uniform float uPulseSpeed;     // скорость дыхания (0.4..1.2)
+uniform float uPulsePhase;     // случайный оффсет
+uniform float uBottomStick;    // зона адгезии внизу (0.0..0.4)
+uniform float uTopBoost;       // откуда усилить движение верхушки (0.6..1.1)
+uniform float uRoundness;      // округление по нормали (0.0..1.0)
+uniform float uLateralAmp;     // боковое дыхание в XZ (0.0..0.02)
+uniform float uRadialStiffness;// жёсткость для труб (0.0..1.0)
+
 varying vec3 vNormal;
 varying vec3 vWorldPos;
 
-float beat(float t) {
+float heartBeat(float t) {
     float s = fract(t);
     return pow(s, 6.0) * exp(-3.0 * s);
 }
 
 void main() {
     vec3 pos = position;
-    vec3 nrm = normalize(normalMatrix * normal);
+    vec3 nrm = normal;
     
-    float y = pos.y;
-    float topMask = smoothstep(uTopMaskH - uTopSmooth, uTopMaskH + uTopSmooth, y);
+    // Нормируем высоту меша 0..1 (предполагаем центр в (0,0,0), диапазон [-0.5 .. +0.5])
+    float halfH = 0.5;
+    float h = clamp((pos.y + halfH) / (2.0 * halfH), 0.0, 1.0);
     
+    // Маска адгезии низа: нижняя часть НЕ двигается
+    float stickMask = smoothstep(uBottomStick - 0.05, uBottomStick + 0.05, h);
+    
+    // Маска верхушки: усиливаем движение выше uTopBoost
+    float topMask = smoothstep(uTopBoost - 0.1, uTopBoost + 0.1, h);
+    
+    // Пульс (short systole, long diastole)
     float t = uTime * uPulseSpeed + uPulsePhase;
-    float p = beat(fract(t));
-    p = smoothstep(0.0, 0.35, p);
-    float amp = uPulseAmp * topMask * p;
+    float beat = heartBeat(t);
+    beat = smoothstep(0.0, 0.4, beat);
     
-    float micro = sin(dot(pos.xz, vec2(8.3, 6.7)) + uTime * 3.7) * 0.15;
-    amp *= (1.0 + micro * 0.25);
+    // Микро-органический шум (лёгкая рябь, но не синусида)
+    float micro = sin(dot(pos.xz, vec2(6.3, 4.7)) + uTime * 3.6) * 0.12;
     
-    pos += normal * amp;
+    // Пульсирующая амплитуда вверх (Y-смещение)
+    // Низ не двигается (stickMask=0), верх двигается (stickMask=1)
+    // Усиливаем вверху (topMask)
+    float pulseUp = (beat + micro * 0.2) * uPulseAmp * stickMask * (0.5 + 0.5 * topMask);
     
-    vNormal = normalize(normalMatrix * normal);
+    // Боковое размыкание (чтобы компенсировать растяжение вверх)
+    // Жёсткость уменьшает латеральную деформацию
+    float stiffK = 1.0 - clamp(uRadialStiffness, 0.0, 1.0);
+    float lateral = uLateralAmp * (0.3 + 0.7 * topMask) * stickMask * stiffK;
+    
+    // Squash-and-stretch: вверх + округление по нормали
+    pos.y += pulseUp;
+    
+    // Округляем верх по нормали (эластичность)
+    float roundK = uRoundness * stiffK;
+    pos += nrm * (pulseUp * roundK);
+    
+    // Латеральное «вдыхание» в плоскости XZ (не трецон, а радиально)
+    float r = length(pos.xz);
+    if (r > 0.0001) {
+        vec2 dir = pos.xz / r;
+        pos.xz += dir * lateral;
+    }
+    
+    // Выход
     vec4 world = modelMatrix * vec4(pos, 1.0);
     vWorldPos = world.xyz;
+    vNormal = normalize(normalMatrix * nrm);
     gl_Position = projectionMatrix * viewMatrix * world;
 }
 `;
@@ -103,8 +137,11 @@ class BioShader extends THREE.ShaderMaterial {
                 uPulseAmp: { value: 0.0 },
                 uPulseSpeed: { value: 0.85 },
                 uPulsePhase: { value: 0.0 },
-                uTopMaskH: { value: 0.35 },
-                uTopSmooth: { value: 0.12 }
+                uBottomStick: { value: 0.18 },
+                uTopBoost: { value: 0.65 },
+                uRoundness: { value: 0.8 },
+                uLateralAmp: { value: 0.006 },
+                uRadialStiffness: { value: 0.0 }
             },
             vertexShader,
             fragmentShader,
@@ -121,12 +158,34 @@ class BioShader extends THREE.ShaderMaterial {
         this.uniforms.uKeyLightDir.value.copy(dir);
     }
     
-    setPulse(amp = 0.015, speed = 0.85, phase = 0, topMaskH = 0.35, topSmooth = 0.12) {
+    // Legacy: для обратной совместимости
+    setPulse(amp = 0.015, speed = 0.85, phase = 0) {
         this.uniforms.uPulseAmp.value = amp;
         this.uniforms.uPulseSpeed.value = speed;
         this.uniforms.uPulsePhase.value = phase;
-        this.uniforms.uTopMaskH.value = topMaskH;
-        this.uniforms.uTopSmooth.value = topSmooth;
+    }
+    
+    // Новый универсальный метод: настройка профиля Squash-and-Stretch
+    setAnimationProfile(opts = {}) {
+        const defaults = {
+            pulseAmp: 0.015,
+            pulseSpeed: 0.85,
+            pulsePhase: Math.random() * Math.PI * 2,
+            bottomStick: 0.18,
+            topBoost: 0.65,
+            roundness: 0.8,
+            lateralAmp: 0.006,
+            radialStiffness: 0.0
+        };
+        const cfg = { ...defaults, ...opts };
+        this.uniforms.uPulseAmp.value = cfg.pulseAmp;
+        this.uniforms.uPulseSpeed.value = cfg.pulseSpeed;
+        this.uniforms.uPulsePhase.value = cfg.pulsePhase;
+        this.uniforms.uBottomStick.value = cfg.bottomStick;
+        this.uniforms.uTopBoost.value = cfg.topBoost;
+        this.uniforms.uRoundness.value = cfg.roundness;
+        this.uniforms.uLateralAmp.value = cfg.lateralAmp;
+        this.uniforms.uRadialStiffness.value = cfg.radialStiffness;
     }
 }
 

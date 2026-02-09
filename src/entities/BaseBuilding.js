@@ -1,6 +1,8 @@
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import shaderProfileManager from '../core/ShaderProfileManager.js';
 import BioShader from '../shaders/BioShader.js';
+import { applyAnimationProfile } from '../shaders/AnimationProfile.js';
 import { COLORS } from '../data/Colors.js';
 
 /**
@@ -598,24 +600,26 @@ class Nucleus extends BaseBuilding {
         this.meshes = {}; // Store LOD meshes
         this.outlineMesh = null; // For toon outline
         
-        // Visual: White pulsing cube (5x5 cells, height = 3 cell sizes)
+        // Visual: White pulsing cube (5x5 cells, low profile)
         const cellSize = 1;
         const width = this.size * cellSize;   // 5 units
-        const height = 3 * cellSize;          // 3 units tall
+        const height = 1 * cellSize;          // 1 unit tall (low nucleus)
         const depth = this.size * cellSize;   // 5 units
         
         // Create textures (normal map and roughness map)
         this.normalTexture = this.createNormalMapTexture(512);
         this.roughnessTexture = this.createRoughnessMapTexture(512);
         
-        // Create beveled geometry with rounded top corners
-        this.geometryLOD0 = this.createRoundedTopBoxGeometry(width, height, depth, 0.4, 16);
-        this.geometryLOD1 = this.createRoundedTopBoxGeometry(width, height, depth, 0.3, 8);
+        // Create perfect rounded box geometry (ideal form, no manual deformation)
+        this.geometryLOD0 = new RoundedBoxGeometry(width, height, depth, 16, 0.4);
+        this.geometryLOD1 = new RoundedBoxGeometry(width, height, depth, 8, 0.3);
         
-        // Use BioShader for animated pulsing nucleus (B1)
+        // Use BioShader for animated pulsing nucleus with Squash-and-Stretch profile
         const material = new BioShader(false, new THREE.Vector3(1, 2, 1).normalize());
         material.uniforms.baseColor.value.setHex(0xffffff);  // White nucleus
-        material.setPulse(0.015, 0.85, Math.random() * Math.PI * 2, 0.35, 0.12);
+        
+        // Apply 'cell' animation profile (soft, full-body respiration)
+        applyAnimationProfile(material, 'cell');
         
         // Store material for damage feedback
         this.baseMaterial = material;
@@ -708,70 +712,6 @@ class Nucleus extends BaseBuilding {
         texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
         texture.repeat.set(4, 4);
         return texture;
-    }
-
-    /**
-     * Create box geometry with rounded top corners
-     */
-    createRoundedTopBoxGeometry(width, height, depth, cornerRadius, segments) {
-        // Create base box geometry
-        const geometry = new THREE.BoxGeometry(width, height, depth, segments, segments, segments);
-        const positions = geometry.getAttribute('position').array;
-        const positionAttribute = geometry.getAttribute('position');
-        
-        const halfWidth = width / 2;      // 2.5 for width=5
-        const halfDepth = depth / 2;      // 2.5 for depth=5
-        const halfHeight = height / 2;    // 1.5 for height=3
-        
-        let cornerCount = 0;
-        
-        // Round top corners with SMOOTH COSINE CURVE
-        for (let i = 0; i < positions.length; i += 3) {
-            const x = positions[i];
-            const y = positions[i + 1];
-            const z = positions[i + 2];
-            
-            // Only affect top portion (top 70% of height)
-            if (y > halfHeight * 0.3) {
-                // Distance from center in X-Z plane
-                const distX = Math.abs(x);
-                const distZ = Math.abs(z);
-                
-                // Check if near corners
-                const edgeOffsetX = halfWidth - distX;  // How far from edge
-                const edgeOffsetZ = halfDepth - distZ;
-                
-                // Apply rounding to corner regions
-                if (edgeOffsetX < cornerRadius * 2.5 && edgeOffsetZ < cornerRadius * 2.5) {
-                    cornerCount++;
-                    
-                    // Smooth falloff using cosine curve (less aggressive)
-                    const xFalloff = Math.max(0, 1 - (edgeOffsetX / (cornerRadius * 2.5)));
-                    const zFalloff = Math.max(0, 1 - (edgeOffsetZ / (cornerRadius * 2.5)));
-                    const rawFactor = Math.max(xFalloff, zFalloff);
-                    
-                    // Use cosine for smooth curve: (1 - cos(PI*x))/2 goes from 0 to 1, smoothly
-                    const smoothFactor = (1 - Math.cos(Math.PI * rawFactor)) / 2;
-                    
-                    // GENTLE rounding - only 15% inward scaling
-                    const maxInset = 0.15;
-                    const scale = 1 - (smoothFactor * maxInset);
-                    
-                    // Apply displacement
-                    positions[i] *= scale;           // Scale X inward gently
-                    positions[i + 2] *= scale;      // Scale Z inward gently
-                    positions[i + 1] += cornerRadius * smoothFactor * 0.2;  // Slight lift
-                }
-            }
-        }
-        
-        console.log(`[Nucleus] Smoothly rounded ${cornerCount} corner vertices with radius ${cornerRadius}`);
-        
-        positionAttribute.needsUpdate = true;
-        geometry.computeVertexNormals();
-        geometry.normalizeNormals();
-        
-        return geometry;
     }
 
     /**
@@ -869,9 +809,9 @@ class Nucleus extends BaseBuilding {
             }
             const newMaterial = new BioShader(false, new THREE.Vector3(1, 2, 1).normalize());
             newMaterial.uniforms.baseColor.value.setHex(0xffffff);
-            newMaterial.setPulse(0.015, 0.85, Math.random() * Math.PI * 2, 0.35, 0.12);
+            applyAnimationProfile(newMaterial, 'cell');
             this.mesh.material = newMaterial;
-            console.log(`[Nucleus] Updated material with BioShader + pulse`);
+            console.log(`[Nucleus] Updated material with BioShader + cell animation profile`);
         }
     }
 

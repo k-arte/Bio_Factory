@@ -133,6 +133,7 @@ class Engine {
         this.selectionOverlayGroup = null; // Selection visualization group
         this.bioShaderMaterial = null;
         this.edgeFogRing = null;  // Radial edge fog ring (A2)
+        this.animatedMaterials = [];  // Track all BioShader materials for time updates
         
         // Asset management system
         this.assetManager = new AssetManager();
@@ -368,7 +369,8 @@ class Engine {
             this.grid,
             this.scene,
             this.resourceManager,
-            this.transportSystem
+            this.transportSystem,
+            this  // Pass engine for material registration
         );
         
         // WIRE PlacementManager building placement events to ProgressionManager
@@ -492,6 +494,17 @@ class Engine {
         this.edgeFogRing.renderOrder = 1;
         this.edgeFogRing.frustumCulled = false;
         this.scene.add(this.edgeFogRing);
+    }
+
+    /**
+     * Register a BioShader material for periodic time updates
+     */
+    registerAnimatedMaterial(material) {
+        if (material && material.uniforms && material.uniforms.uTime) {
+            if (!this.animatedMaterials.includes(material)) {
+                this.animatedMaterials.push(material);
+            }
+        }
     }
 
     createGridCursor() {
@@ -971,11 +984,17 @@ class Engine {
             mat.uniforms.uStrength.value = THREE.MathUtils.lerp(0.78, 0.9, (this.rtsCamera.currentZoom - 10) / 50);
         }
         
-        // Update BioShader time
+        // Update BioShader time (grid shader)
         if (this.bioShaderMaterial) {
             this.bioShaderMaterial.updateTime(time);
         }
         
+        // Update all registered animated materials (nucleus, buildings, pipes, etc.)
+        for (const material of this.animatedMaterials) {
+            if (material.uniforms && material.uniforms.uTime) {
+                material.uniforms.uTime.value = time;
+            }
+        }
         // Pulse the point light with the sphere
         if (this.pointLight) {
             const pulseIntensity = 0.3 + 0.4 * Math.sin(time * 2.5);
