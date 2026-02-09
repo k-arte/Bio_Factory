@@ -171,6 +171,7 @@ class Grid {
      * Create procedural wet flesh texture (red with organic roughness)
      */
     createFleshTexture(size = 512) {
+        const canvas = document.createElement('canvas');
         canvas.width = canvas.height = size;
         const ctx = canvas.getContext('2d');
         
@@ -272,10 +273,10 @@ class Grid {
                         const idx = (yi * size + xi) * 4;
                         const intensity = 1 - (dist / radius);
                         
-                        // BRIGHT glossy highlights - simulate wet sheen/moisture
-                        data[idx] = Math.min(255, data[idx] + intensity * 100);      // Very bright red
-                        data[idx + 1] = Math.min(255, data[idx + 1] + intensity * 80);
-                        data[idx + 2] = Math.min(255, data[idx + 2] + intensity * 90);
+                        // SUBDUED glossy highlights - reduced intensity for ACES compatibility
+                        data[idx] = Math.min(255, data[idx] + intensity * 60);       // Reduced from 100
+                        data[idx + 1] = Math.min(255, data[idx + 1] + intensity * 45);  // Reduced from 80
+                        data[idx + 2] = Math.min(255, data[idx + 2] + intensity * 50);  // Reduced from 90
                     }
                 }
             }
@@ -326,6 +327,155 @@ class Grid {
     }
 
     /**
+     * Create proper roughness map (grayscale, not color)
+     * Dark = smooth/wet, Light = rough/dry edges
+     */
+    createRoughnessFromFlesh(size = 512) {
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        
+        // Base medium roughness
+        ctx.fillStyle = '#b0b0b0';  // ~0.7 roughness
+        ctx.fillRect(0, 0, size, size);
+        
+        const img = ctx.getImageData(0, 0, size, size);
+        const d = img.data;
+        
+        // Large grain blocks for variation
+        const block = 32;
+        for (let y = 0; y < size; y += block) {
+            for (let x = 0; x < size; x += block) {
+                const v = 0.55 + (Math.random() - 0.5) * 0.25;  // ~0.42..0.67
+                for (let yi = y; yi < Math.min(y + block, size); yi++) {
+                    for (let xi = x; xi < Math.min(x + block, size); xi++) {
+                        const idx = (yi * size + xi) * 4;
+                        const g = Math.round(255 * v);
+                        d[idx] = d[idx + 1] = d[idx + 2] = g;
+                        d[idx + 3] = 255;
+                    }
+                }
+            }
+        }
+        
+        // Cracks: rougher edges, smooth core
+        const cracks = 14;
+        for (let i = 0; i < cracks; i++) {
+            const sx = Math.random() * size;
+            const sy = Math.random() * size;
+            const ang = Math.random() * Math.PI * 2;
+            const len = size * (0.35 + Math.random() * 0.45);
+            const w = 10 + Math.random() * 14;
+            
+            for (let t = 0; t < len; t += 2) {
+                const cx = Math.floor(sx + Math.cos(ang) * t);
+                const cy = Math.floor(sy + Math.sin(ang) * t);
+                
+                for (let wy = -w; wy <= w; wy++) {
+                    for (let wx = -w; wx <= w; wx++) {
+                        const px = cx + wx, py = cy + wy;
+                        if (px < 0 || px >= size || py < 0 || py >= size) continue;
+                        
+                        const idx = (py * size + px) * 4;
+                        const dist = Math.hypot(wx, wy);
+                        if (dist <= w) {
+                            const edge = dist / w;
+                            // Crack edge rougher, core smoother
+                            let g = d[idx] + edge * 60 - (1.0 - edge) * 70;
+                            g = Math.max(20, Math.min(235, g));
+                            d[idx] = d[idx + 1] = d[idx + 2] = g;
+                        }
+                    }
+                }
+            }
+        }
+        
+        ctx.putImageData(img, 0, 0);
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+        tex.repeat.set(2, 2);
+        tex.magFilter = THREE.LinearFilter;
+        tex.minFilter = THREE.LinearMipMapLinearFilter;
+        return tex;
+    }
+
+    /**
+     * Create ambient occlusion map (emphasize cracks/crevices)
+     */
+    createAOFromFlesh(size = 512) {
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        
+        // Base light (low occlusion)
+        ctx.fillStyle = '#f2f2f2';
+        ctx.fillRect(0, 0, size, size);
+        
+        const img = ctx.getImageData(0, 0, size, size);
+        const d = img.data;
+        
+        // Same crack pattern, but darkened
+        const cracks = 14;
+        for (let i = 0; i < cracks; i++) {
+            const sx = Math.random() * size;
+            const sy = Math.random() * size;
+            const ang = Math.random() * Math.PI * 2;
+            const len = size * (0.35 + Math.random() * 0.5);
+            const w = 10 + Math.random() * 14;
+            
+            for (let t = 0; t < len; t += 1.5) {
+                const cx = Math.floor(sx + Math.cos(ang) * t);
+                const cy = Math.floor(sy + Math.sin(ang) * t);
+                
+                for (let wy = -w; wy <= w; wy++) {
+                    for (let wx = -w; wx <= w; wx++) {
+                        const px = cx + wx, py = cy + wy;
+                        if (px < 0 || px >= size || py < 0 || py >= size) continue;
+                        
+                        const idx = (py * size + px) * 4;
+                        const dist = Math.hypot(wx, wy);
+                        if (dist <= w) {
+                            const f = 1 - dist / w;
+                            let g = d[idx];
+                            g -= Math.round(110 * f);
+                            d[idx] = d[idx + 1] = d[idx + 2] = Math.max(20, g);
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Light blur pass
+        const smooth = (buf, it = 1) => {
+            for (let k = 0; k < it; k++) {
+                const tmp = new Uint8ClampedArray(buf);
+                for (let y = 1; y < size - 1; y++) {
+                    for (let x = 1; x < size - 1; x++) {
+                        const id = (y * size + x) * 4;
+                        let s = 0;
+                        for (let dy = -1; dy <= 1; dy++) {
+                            for (let dx = -1; dx <= 1; dx++) {
+                                s += tmp[((y + dy) * size + (x + dx)) * 4];
+                            }
+                        }
+                        const g = s / 9;
+                        buf[id] = buf[id + 1] = buf[id + 2] = g;
+                    }
+                }
+            }
+        };
+        smooth(d, 1);
+        
+        ctx.putImageData(img, 0, 0);
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+        tex.repeat.set(2, 2);
+        tex.magFilter = THREE.LinearFilter;
+        tex.minFilter = THREE.LinearMipMapLinearFilter;
+        return tex;
+    }
+
+    /**
      * Create colored terrain tiles (OPTIMIZED - single merged geometry)
      */
     createSimpleTerrainTiles(halfSize) {
@@ -363,13 +513,27 @@ class Grid {
                     [-tileWidth / 2, posY, tileHeight / 2]
                 ];
                 
-                // UV coordinates for texture
-                const uvCoords = [
+                // Pseudo-random UV variant (deterministic per tile for consistency)
+                const variant = (x * 73856093 ^ z * 19349663) & 3;
+                const flipX = ((x * 83492791 ^ z * 2971215073) & 1) === 1;
+                const flipY = ((x * 2654435761 ^ z * 1597334677) & 1) === 1;
+                
+                // Base UV coordinates
+                let uvCoords = [
                     [0, 0],
                     [1, 0],
                     [1, 1],
                     [0, 1]
                 ];
+                
+                // Apply flip transformations
+                if (flipX) uvCoords = uvCoords.map(([u, v]) => [1 - u, v]);
+                if (flipY) uvCoords = uvCoords.map(([u, v]) => [u, 1 - v]);
+                
+                // Apply rotation (0, 90, 180, 270 degrees)
+                for (let r = 0; r < variant; r++) {
+                    uvCoords = [uvCoords[3], uvCoords[0], uvCoords[1], uvCoords[2]];
+                }
 
                 // Add vertices offset to world position
                 corners.forEach((corner, idx) => {
@@ -399,22 +563,30 @@ class Grid {
         // Build the merged geometry
         mergedGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(positions), 3));
         mergedGeometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(uvs), 2));
+        // Duplicate UV for AO map (uv2)
+        mergedGeometry.setAttribute('uv2', new THREE.BufferAttribute(new Float32Array(uvs), 2));
         mergedGeometry.setIndex(new THREE.BufferAttribute(new Uint32Array(indices), 1));
         
         // Compute normals for lighting
         mergedGeometry.computeVertexNormals();
         mergedGeometry.computeBoundingBox();
 
+        // Create roughness and AO maps with proper connection to texture system
+        const roughnessMap = this.createRoughnessFromFlesh(512);
+        const aoMap = this.createAOFromFlesh(512);
+
         // Material for wet flesh ground - SIMPLIFIED for visibility
         // Use MeshStandardMaterial directly for reliable rendering
         const fleshMaterial = new THREE.MeshStandardMaterial({
             map: fleshTexture,
-            roughnessMap: roughnessTexture,
+            roughnessMap: roughnessMap,           // Use procedural roughness
             normalMap: normalMap,
+            aoMap: aoMap,                          // Add ambient occlusion map
+            aoMapIntensity: 0.6,                   // Moderate AO intensity
             color: COLORS.GROUND_PRIMARY,
             emissive: COLORS.GROUND_EMIT,
             emissiveMap: roughnessTexture,
-            emissiveIntensity: 0.5,
+            emissiveIntensity: 0.25,               // Reduced from 0.5 for subtler glow
             
             roughness: 0.6,          // Wet appearance
             metalness: 0.0,          // Not metallic
@@ -463,7 +635,7 @@ class Grid {
         const material = new THREE.LineBasicMaterial({
             color: gridColor,
             transparent: true,
-            opacity: 0.7
+            opacity: 0.55                // Reduced from 0.7 for subtler grid
         });
         
         const gridLines = new THREE.LineSegments(geometry, material);

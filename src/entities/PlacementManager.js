@@ -47,6 +47,9 @@ class PlacementManager {
             resourceType
         );
 
+        // Store construction cost for deconstruction refund
+        extractor._buildingCost = { RES_GLUCOSE: 10 };
+
         this.buildings.set(key, {
             type: this.buildingTypes.EXTRACTOR,
             building: extractor
@@ -74,6 +77,9 @@ class PlacementManager {
         }
 
         const storage = new Storage(gridX, gridZ, this.grid, this.scene, this.resourceManager);
+
+        // Store construction cost for deconstruction refund
+        storage._buildingCost = { RES_GLUCOSE: 15 };
 
         this.buildings.set(key, {
             type: this.buildingTypes.STORAGE,
@@ -227,6 +233,68 @@ class PlacementManager {
         });
 
         return stats;
+    }
+
+    /**
+     * Deconstruct all selected buildings (Cell Death)
+     * Returns resources and removes buildings
+     * NOTE: Pluripotent Nucleus (main nucleus) cannot be deconstructed
+     */
+    deconstuctSelectedBuildings() {
+        let deconstructCount = 0;
+        const keysToRemove = [];
+        const resourcesReturned = {};
+
+        // Find all selected buildings (excluding Nucleus)
+        this.buildings.forEach(({ building }, key) => {
+            if (building && building._isSelected) {
+                // Check if building is a Pluripotent Nucleus - cannot deconstruct
+                if (building.isMainBuilding || building.bioId === 'BLD_NUCLEUS_MAIN') {
+                    console.warn(`[PlacementManager] Cannot deconstruct Pluripotent Nucleus - it is indestructible`);
+                    return; // Skip this building
+                }
+                keysToRemove.push(key);
+            }
+        });
+
+        // Remove them from scene and map, return their resources
+        keysToRemove.forEach(key => {
+            const { building } = this.buildings.get(key);
+            if (building) {
+                // Return construction cost resources
+                const cost = building._buildingCost || { RES_GLUCOSE: 5 }; // Default cost
+                for (const [resourceType, amount] of Object.entries(cost)) {
+                    if (!resourcesReturned[resourceType]) {
+                        resourcesReturned[resourceType] = 0;
+                    }
+                    resourcesReturned[resourceType] += amount;
+                }
+
+                // Remove from scene
+                if (building.mesh && this.scene) {
+                    this.scene.remove(building.mesh);
+                }
+                if (building.cellIndicator && this.scene) {
+                    this.scene.remove(building.cellIndicator);
+                }
+
+                // Call destroy if available
+                if (building.destroy) {
+                    building.destroy();
+                }
+
+                this.buildings.delete(key);
+                deconstructCount++;
+                console.log(`[PlacementManager] Deconstructed building at ${key}, returned: ${JSON.stringify(cost)}`);
+            }
+        });
+
+        // Log total resources returned
+        if (deconstructCount > 0) {
+            console.log(`[PlacementManager] ✓ Deconstructed ${deconstructCount} buildings, returned: ${JSON.stringify(resourcesReturned)}`);
+        }
+
+        return deconstructCount;
     }
 
     clear() {

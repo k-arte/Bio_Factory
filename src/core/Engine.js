@@ -19,7 +19,7 @@ class RTSCamera {
         this.inputManager = inputManager;
 
         // Zoom settings
-        this.minZoom = 10;
+        this.minZoom = 5;
         this.maxZoom = 60;
         this.zoomSpeed = 0.05;
         this.currentZoom = 30;
@@ -160,30 +160,33 @@ class Engine {
     setupScene() {
         console.log('[Engine] Setting up scene...');
         
-        // Background color - dark blue for visibility
-        this.scene.background = new THREE.Color(0x001a2e);
-        this.scene.fog = new THREE.Fog(0x001a2e, 100, 150);
+        // Background color - slightly warmer for better mood
+        this.scene.background = new THREE.Color(0x0a1722);
+        this.scene.fog = new THREE.Fog(0x0a1722, 90, 140);
         
-        // STRONG AMBIENT LIGHT - primary light source
-        const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
-        this.scene.add(ambientLight);
-        console.log('[Engine] Ambient light added (1.2 intensity)');
+        // 1) Soft ambient fill with hemisphere light (warm top, dark red bottom reflection)
+        const hemi = new THREE.HemisphereLight(0xffead6, 0x1a0b0b, 0.55);
+        this.scene.add(hemi);
+        console.log('[Engine] Hemisphere light added (warm fill, 0.55 intensity)');
         
-        // STRONG KEY LIGHT - warm directional light to define form
-        const keyLight = new THREE.DirectionalLight(0xffe4cc, 0.8);
-        keyLight.position.set(1, 2, 1).normalize().multiplyScalar(50);
-        keyLight.castShadow = false;
+        // 2) Main key light - warm directional light that defines form
+        const keyLight = new THREE.DirectionalLight(0xffe0c0, 0.75);
+        keyLight.position.set(1, 2, 1).normalize().multiplyScalar(60);
+        keyLight.castShadow = true;
+        keyLight.shadow.mapSize.set(1024, 1024);
+        keyLight.shadow.radius = 2.5;  // Soft PCF shadows
+        keyLight.shadow.bias = -0.0003;
         this.scene.add(keyLight);
-        console.log('[Engine] Key light added (warm, 0.8 intensity)');
+        console.log('[Engine] Key light added (warm, soft shadows, 0.75 intensity)');
         
-        // RIM LIGHT - backlight to define edges
-        const rimLight = new THREE.DirectionalLight(0xffffff, 0.4);
-        rimLight.position.set(-1, 1, -1).normalize().multiplyScalar(50);
+        // 3) Rim light - cool backlight to define edges and contours
+        const rimLight = new THREE.DirectionalLight(0xcfe6ff, 0.22);
+        rimLight.position.set(-1, 1.2, -1).normalize().multiplyScalar(50);
         rimLight.castShadow = false;
         this.scene.add(rimLight);
-        console.log('[Engine] Rim light added (0.4 intensity)');
+        console.log('[Engine] Rim light added (cool, 0.22 intensity)');
         
-        console.log('[Engine] Scene setup complete (strong direct lighting)');
+        console.log('[Engine] Scene setup complete (optimized 3-light setup)');
     }
 
 
@@ -194,20 +197,22 @@ class Engine {
 
     setupRenderer() {
         this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));  // Cap for performance
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
         this.renderer.shadowMap.enabled = true;
-        this.renderer.shadowMap.type = THREE.PCFShadowMap;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;  // Soft shadow edges
         this.renderer.shadowMap.autoUpdate = true;
         this.renderer.outputColorSpace = THREE.SRGBColorSpace;
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        this.renderer.toneMappingExposure = 1.2;  // Soft exposure for saturated reds and proper highlights
+        this.renderer.toneMappingExposure = 1.05;  // Reduced from 1.2 - less highlight clipping
+        this.renderer.physicallyCorrectLights = true;  // Consistent light intensity
+        this.renderer.dithering = true;  // Smooth banding on toon steps
         
         // Performance optimizations
-        this.renderer.sortObjects = false;  // Don't sort every frame
-        this.renderer.precision = 'mediump';  // Medium precision
+        this.renderer.sortObjects = false;
+        this.renderer.precision = 'mediump';
         
         document.body.appendChild(this.renderer.domElement);
-        console.log('[Engine] Renderer setup complete (sRGB + ACES + exposure 1.2)');
+        console.log('[Engine] Renderer setup complete (PCFSoft shadows, ACES 1.05, dithering enabled)');
     }
 
     initializeGridAndCamera(grid) {
@@ -222,7 +227,7 @@ class Engine {
             // Create HUD first (includes Inventory and Hotbar)
             try {
                 this.hud = new HUD(null);
-                this.hud.engine = this;  // Wire engine to HUD for selection visualization
+                this.hud.setEngine(this);  // Wire engine to HUD for selection actions
                 console.log('[Engine] HUD created and wired to engine');
             } catch (e) {
                 console.error('[Engine] ERROR creating HUD:', e);
@@ -489,7 +494,7 @@ class Engine {
     visualizeSelection(selectionRegion) {
         // Clear previous overlays
         while (this.selectionOverlayGroup.children.length > 0) {
-            this.selectionOverlayGroup.removeChild(this.selectionOverlayGroup.children[0]);
+            this.selectionOverlayGroup.remove(this.selectionOverlayGroup.children[0]);
         }
         
         if (!selectionRegion || !this.grid) {
@@ -548,7 +553,7 @@ class Engine {
      */
     clearSelectionOverlay() {
         while (this.selectionOverlayGroup.children.length > 0) {
-            this.selectionOverlayGroup.removeChild(this.selectionOverlayGroup.children[0]);
+            this.selectionOverlayGroup.remove(this.selectionOverlayGroup.children[0]);
         }
         console.log('[Engine] Selection overlays cleared');
     }
@@ -717,6 +722,15 @@ class Engine {
         // Prevent accidental text selection during drag
         this.renderer.domElement.addEventListener('selectstart', (e) => e.preventDefault());
         
+        // Escape key to deselect everything
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                console.log('[Engine] Escape pressed - clearing selection');
+                this.clearSelectionOverlay();
+                this.clearAllBuildingHighlights();
+            }
+        });
+        
         console.log('[Engine] Mouse tracking setup complete - drag selection enabled');
     }
 
@@ -729,6 +743,7 @@ class Engine {
         
         const elevationAmount = 0.3; // Lift buildings up
         const highlightColor = new THREE.Color(0xffaa00); // Orange/yellow filter
+        let buildingCount = 0;
         
         // Search for buildings in each selected cell
         for (let x = minX; x <= maxX; x++) {
@@ -766,9 +781,16 @@ class Engine {
                     
                     // Mark as selected
                     building._isSelected = true;
+                    buildingCount++;
                     console.log(`[Engine] Highlighted building at [${x}, ${z}]`);
                 }
             }
+        }
+        
+        // Show selection action panel only if at least one building was selected
+        if (buildingCount > 0 && this.hud && this.hud.showSelectionActionPanel) {
+            this.hud.showSelectionActionPanel();
+            console.log(`[Engine] Selection action panel shown - ${buildingCount} buildings selected`);
         }
     }
 
@@ -807,6 +829,11 @@ class Engine {
         this.placementManager.buildings.forEach(({ building }) => {
             this.clearBuildingHighlight(building);
         });
+        
+        // Hide selection action panel
+        if (this.hud && this.hud.hideSelectionActionPanel) {
+            this.hud.hideSelectionActionPanel();
+        }
     }
 
     updateParticles() {

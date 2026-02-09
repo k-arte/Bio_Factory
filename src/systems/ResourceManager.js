@@ -290,6 +290,27 @@ class ResourceManager {
     }
 
     /**
+     * Update all active resources (called each frame)
+     * Handles animation and lifecycle updates
+     */
+    updateAll(deltaTime) {
+        // Iterate through all active resources
+        for (const [resourceId, tracked] of this.activeResources) {
+            if (!tracked || !tracked.mesh) continue;
+
+            // Simple rotation animation
+            tracked.mesh.rotation.x += 0.01;
+            tracked.mesh.rotation.z += 0.02;
+
+            // Could add more logic here:
+            // - Lifetime management
+            // - Particle effects
+            // - Physics updates
+            // - Despawning logic
+        }
+    }
+
+    /**
      * Get pool statistics for debugging
      */
     getStats() {

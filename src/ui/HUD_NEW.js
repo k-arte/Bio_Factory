@@ -18,6 +18,7 @@ import shaderProfileManager from '../core/ShaderProfileManager.js';
 class HUD {
     constructor(inputManager) {
         this.inputManager = inputManager;
+        this.engine = null; // Will be set by Engine.js
         
         // UI state
         this.selectedBuilding = null;
@@ -64,6 +65,7 @@ class HUD {
         this.createTopLeftMenu();        // Settings + Guide + Diagnostics
         this.createBottomRightToggle();  // Resources + Buildings + Draft toggles
         this.createInventoryToggle();    // Inventory button (bottom-right)
+        this.createSelectionActionPanel();     // Selection actions (Cancel, Move, Cell Death)
         this.createResourcesPanel();     // Resources panel (hidden by default)
         this.createBuildingsPanel();     // Buildings panel (hidden by default)
         this.createGuidePanel();         // Guide panel (hidden by default)
@@ -75,6 +77,14 @@ class HUD {
 
         // Setup interactivity
         this.setupEventListeners();
+    }
+
+    /**
+     * Set engine reference (called by Engine after HUD is created)
+     */
+    setEngine(engine) {
+        this.engine = engine;
+        console.log('[HUD] Engine reference set');
     }
 
     /**
@@ -178,6 +188,96 @@ class HUD {
         document.body.appendChild(toggle);
         
         this.inventoryBtn = toggle;
+    }
+
+    /**
+     * SELECTION ACTIONS PANEL: Shows when buildings are selected
+     * Allows Cancel, Move, and Cell Death (deconstruction)
+     */
+    createSelectionActionPanel() {
+        const panel = document.createElement('div');
+        panel.id = 'selection-action-panel';
+        panel.className = 'selection-action-panel hidden';
+        
+        panel.innerHTML = `
+            <div class="selection-actions-header">
+                <span class="selection-actions-title">⚡ ACTIONS</span>
+                <button class="panel-close" id="close-selection-actions">✕</button>
+            </div>
+            <div class="selection-actions-container">
+                <button id="btn-action-cancel" class="selection-action-btn action-cancel" title="Deselect buildings [Esc]">
+                    ❌ CANCEL
+                </button>
+                <button id="btn-action-move" class="selection-action-btn action-move" title="Move selected buildings">
+                    ➡️ MOVE
+                </button>
+                <button id="btn-action-cell-death" class="selection-action-btn action-cell-death" title="Deconstruct buildings">
+                    💀 CELL DEATH
+                </button>
+            </div>
+        `;
+        
+        document.body.appendChild(panel);
+        
+        this.selectionActionPanel = panel;
+        this.actionBtnCancel = panel.querySelector('#btn-action-cancel');
+        this.actionBtnMove = panel.querySelector('#btn-action-move');
+        this.actionBtnCellDeath = panel.querySelector('#btn-action-cell-death');
+        this.actionCloseBtn = panel.querySelector('#close-selection-actions');
+        
+        // Setup button event listeners
+        this.actionBtnCancel.addEventListener('click', () => {
+            console.log('[HUD] Cancel action clicked');
+            this.hideSelectionActionPanel();
+            if (this.engine) {
+                this.engine.clearAllBuildingHighlights();
+                this.engine.clearSelectionOverlay();
+            }
+        });
+        
+        this.actionBtnMove.addEventListener('click', () => {
+            console.log('[HUD] Move action clicked');
+            // TODO: Implement move action
+            alert('Move action - not yet implemented');
+        });
+        
+        this.actionBtnCellDeath.addEventListener('click', () => {
+            console.log('[HUD] Cell Death (deconstruction) action clicked');
+            if (this.engine && this.engine.placementManager) {
+                const count = this.engine.placementManager.deconstuctSelectedBuildings();
+                if (count > 0) {
+                    console.log(`[HUD] Deconstructed ${count} buildings`);
+                    this.hideSelectionActionPanel();
+                    this.engine.clearAllBuildingHighlights();
+                    this.engine.clearSelectionOverlay();
+                }
+            }
+        });
+        
+        this.actionCloseBtn.addEventListener('click', () => {
+            console.log('[HUD] Close selection actions');
+            this.hideSelectionActionPanel();
+        });
+    }
+
+    /**
+     * Show selection action panel when buildings are selected
+     */
+    showSelectionActionPanel() {
+        if (this.selectionActionPanel) {
+            this.selectionActionPanel.classList.remove('hidden');
+            console.log('[HUD] Selection action panel shown');
+        }
+    }
+
+    /**
+     * Hide selection action panel
+     */
+    hideSelectionActionPanel() {
+        if (this.selectionActionPanel) {
+            this.selectionActionPanel.classList.add('hidden');
+            console.log('[HUD] Selection action panel hidden');
+        }
     }
 
     /**
@@ -529,6 +629,20 @@ class HUD {
             console.log('[HUD] Updated resources UI with', resourceEntries.length, 'resources');
         } catch (err) {
             console.error('[HUD] Error updating resources UI:', err);
+        }
+    }
+
+    /**
+     * Update cursor info (coordinates and terrain type)
+     */
+    updateCursorInfo(terrainName, x, z) {
+        this.gridCoordinates = { x, z };
+        this.terrainType = terrainName;
+        if (this.infoPanel.coords) {
+            this.infoPanel.coords.textContent = `${x}, ${z}`;
+        }
+        if (this.infoPanel.terrain) {
+            this.infoPanel.terrain.textContent = terrainName || 'Unknown';
         }
     }
 
