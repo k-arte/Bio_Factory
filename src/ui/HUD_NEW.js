@@ -480,8 +480,11 @@ class HUD {
                     .join('\n');
             }
             
+            // Use icon from BioDatabase, fallback to default
+            const icon = building.icon || '🏢';
+            
             card.innerHTML = `
-                <div class="building-card-icon">${building.icon}</div>
+                <div class="building-card-icon">${icon}</div>
                 <div class="building-card-info">
                     <div class="building-card-name">${building.name}</div>
                     <div class="building-card-cost">${costStr}</div>

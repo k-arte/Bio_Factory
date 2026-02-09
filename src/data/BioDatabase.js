@@ -244,6 +244,7 @@ const BioDatabase = {
     {
       id: "BLD_PERICYTE_EXTRACTOR",
       name: "Клетка‑катаболик (перицит)",
+      icon: "🏭",
       tier: "t0",
       tags: ["GENERATOR"],
       size: [1, 1],
@@ -253,6 +254,7 @@ const BioDatabase = {
     {
       id: "BLD_ANABOLIC_CELL",
       name: "Клетка‑анаболик",
+      icon: "🧬",
       tier: "t0",
       tags: ["GENERATOR"],
       size: [1, 1],
@@ -262,6 +264,7 @@ const BioDatabase = {
     {
       id: "BLD_SPONGE_CELL",
       name: "Губчатая клетка (балансировщик)",
+      icon: "⚖️",
       tier: "t1",
       tags: ["BALANCER"],
       size: [1, 1],
@@ -271,6 +274,7 @@ const BioDatabase = {
     {
       id: "BLD_RESOURCE_DIFFUSER",
       name: "Рассеватель ресурсов",
+      icon: "💧",
       tier: "t1",
       tags: ["DIFFUSER", "SYSTEM_STRUCTURE"],
       size: [2, 2],
@@ -282,6 +286,7 @@ const BioDatabase = {
     {
       id: "BLD_STORAGE_MICRO",
       name: "Микро‑вакуоль",
+      icon: "█",
       tier: "t0",
       tags: ["STORAGE"],
       size: [1, 1],
@@ -291,6 +296,7 @@ const BioDatabase = {
     {
       id: "BLD_VESSEL",
       name: "Сосуд",
+      icon: "━",
       tier: "t0",
       tags: ["VESSEL", "SYSTEM_STRUCTURE"],
       size: [1, 1],
@@ -301,6 +307,7 @@ const BioDatabase = {
     {
       id: "BLD_CARDIOCYTE_PUMP",
       name: "Кардиоцит‑насос",
+      icon: "🌊",
       tier: "t1",
       tags: ["PUMP", "SYSTEM_STRUCTURE"],
       size: [2, 2],
