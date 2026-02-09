@@ -7,6 +7,9 @@ class PlacementManager {
         this.resourceManager = resourceManager;
         this.transportSystem = transportSystem;
         
+        // Event listener for building placement (fired after successful placement)
+        this.onBuildingPlaced = null; // (buildingId, buildingType, gridX, gridZ) -> void
+        
         this.buildings = new Map();
         this.buildingTypes = {
             EXTRACTOR: 'EXTRACTOR',
@@ -16,7 +19,16 @@ class PlacementManager {
     }
 
     /**
+     * Register a callback for building placement events
+     */
+    onPlaced(callback) {
+        this.onBuildingPlaced = callback;
+        console.log('[PlacementManager] Registered onBuildingPlaced listener');
+    }
+
+    /**
      * Place an Extractor building
+     * FIRES: onBuildingPlaced event
      */
     placeExtractor(gridX, gridZ, resourceType = 'ION') {
         const key = `${gridX}_${gridZ}`;
@@ -40,11 +52,18 @@ class PlacementManager {
             building: extractor
         });
 
+        // Fire building placement event
+        if (this.onBuildingPlaced) {
+            this.onBuildingPlaced('BLD_EXTRACTOR', this.buildingTypes.EXTRACTOR, gridX, gridZ);
+        }
+
+        console.log(`[PlacementManager] Placed EXTRACTOR at (${gridX}, ${gridZ})`);
         return extractor;
     }
 
     /**
      * Place a Storage building
+     * FIRES: onBuildingPlaced event
      */
     placeStorage(gridX, gridZ) {
         const key = `${gridX}_${gridZ}`;
@@ -61,11 +80,18 @@ class PlacementManager {
             building: storage
         });
 
+        // Fire building placement event
+        if (this.onBuildingPlaced) {
+            this.onBuildingPlaced('BLD_STORAGE', this.buildingTypes.STORAGE, gridX, gridZ);
+        }
+
+        console.log(`[PlacementManager] Placed STORAGE at (${gridX}, ${gridZ})`);
         return storage;
     }
 
     /**
      * Place a Nucleus (main command building) - spans 5x5 cells
+     * FIRES: onBuildingPlaced event
      */
     placeNucleus(gridX, gridZ) {
         const nucleusSize = 5;
@@ -94,6 +120,12 @@ class PlacementManager {
             }
         }
 
+        // Fire building placement event
+        if (this.onBuildingPlaced) {
+            this.onBuildingPlaced('BLD_NUCLEUS', 'NUCLEUS', gridX, gridZ);
+        }
+
+        console.log(`[PlacementManager] Placed NUCLEUS at (${gridX}, ${gridZ})`);
         return nucleus;
     }
 

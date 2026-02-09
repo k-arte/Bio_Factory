@@ -36,6 +36,11 @@ class HUD {
         // Initialize progression systems
         try {
             this.saveManager = new SaveManager();
+            
+            // Start auto-save (every 30 seconds)
+            this.saveManager.startAutoSave();
+            console.log('[HUD] Auto-save enabled on SaveManager');
+            
             this.progressionManager = new ProgressionManager();
             this.progressionManager.initialize(this.saveManager).then(() => {
                 console.log('[HUD] ProgressionManager initialized, refreshing guide');

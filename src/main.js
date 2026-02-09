@@ -1,9 +1,5 @@
 import Engine from './core/Engine.js';
-import Lighting from './core/Lighting.js';
 import Grid from './world/Grid.js';
-import ResourceManager from './systems/ResourceManager.js';
-import TransportSystem from './entities/TransportSystem.js';
-import PlacementManager from './entities/PlacementManager.js';
 import * as THREE from 'three';
 
 // Initialize engine
@@ -11,11 +7,6 @@ try {
     console.log('[INIT] Creating Engine...');
     const engine = new Engine();
     console.log('[INIT] Engine created, scene has', engine.scene.children.length, 'children');
-
-    // Add lighting
-    console.log('[INIT] Setting up Lighting...');
-    new Lighting(engine.scene);
-    console.log('[INIT] Lighting ready, scene has', engine.scene.children.length, 'children');
 
     // Create grid
     console.log('[INIT] Creating Grid...');

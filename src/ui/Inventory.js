@@ -1,10 +1,14 @@
 /**
  * Inventory: Pure data store for resources and buildings
+ * Now reads from BioDatabase as Source of Truth for building costs/properties
  * No DOM manipulation - HUD_NEW.js handles all UI updates
  */
+import BioDatabase from '../data/BioDatabase.js';
+
 class Inventory {
     constructor(hud) {
         this.hud = hud;
+        this.database = BioDatabase;
         this.onResourceChange = null; // Callback: function(resourceType, newAmount)
         this.onBuildingChange = null; // Callback: function(buildingKey, newState)
         
@@ -17,8 +21,49 @@ class Inventory {
             lipid: { name: 'Lipid', amount: 0, icon: '◆', unit: 'mg/dL' }
         };
 
-        // Building catalog
-        this.buildings = {
+        // Building catalog (with data-driven defaults from BioDatabase)
+        this.buildings = this._initializeBuildingsFromDatabase();
+    }
+
+    /**
+     * Initialize building catalog from BioDatabase
+     * Maps database entries to UI building keys
+     */
+    _initializeBuildingsFromDatabase() {
+        const buildings = {};
+        
+        // Build mapping: key -> {name, cost, buildTime, ...}
+        const BUILDING_MAP = {
+            'extractor': 'BLD_EXTRACTOR',
+            'vessel': null,  // Not in BioDatabase yet
+            'mitochondria': 'BLD_MITOCHONDRIA', 
+            'cytosol': null, // Not in BioDatabase
+            'storage': null, // Not in BioDatabase
+            'defender': null // Not in BioDatabase
+        };
+        
+        // First pass: read from BioDatabase
+        for (const [uiKey, dbId] of Object.entries(BUILDING_MAP)) {
+            if (!dbId) continue;
+            
+            const dbEntry = this.database.buildings?.find(b => b.id === dbId);
+            if (dbEntry) {
+                buildings[uiKey] = {
+                    name: dbEntry.name,
+                    type: uiKey,
+                    description: dbEntry.description,
+                    category: dbEntry.category || 'Building',
+                    icon: dbEntry.icon,
+                    hotkey: this._mapHotkey(uiKey),
+                    cost: dbEntry.cost || {},
+                    buildTime: dbEntry.buildTime || 10,
+                    dbEntry // Keep reference for future use
+                };
+            }
+        }
+        
+        // Second pass: add defaults for buildings not yet in database
+        const defaults = {
             extractor: {
                 name: 'Extractor',
                 type: 'extractor',
@@ -80,6 +125,31 @@ class Inventory {
                 buildTime: 8
             }
         };
+        
+        // Fill in missing buildings from defaults
+        for (const [key, defaultData] of Object.entries(defaults)) {
+            if (!buildings[key]) {
+                buildings[key] = defaultData;
+            }
+        }
+        
+        console.log('[Inventory] Initialized', Object.keys(buildings).length, 'buildings from BioDatabase');
+        return buildings;
+    }
+
+    /**
+     * Map building UI key to hotkey number
+     */
+    _mapHotkey(buildingKey) {
+        const hotkeyMap = {
+            'extractor': '1',
+            'vessel': '2',
+            'mitochondria': '3',
+            'cytosol': '4',
+            'storage': '5',
+            'defender': '6'
+        };
+        return hotkeyMap[buildingKey] || '0';
     }
 
     /**

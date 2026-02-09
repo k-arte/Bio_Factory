@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import BioShader from '../shaders/BioShader.js';
-import ResourceManager from '../world/ResourceManager.js';
+import ResourceManager from '../systems/ResourceManager.js';
 import TransportSystem from '../entities/TransportSystem.js';
 import PlacementManager from '../entities/PlacementManager.js';
 import VesselSystemV2 from '../entities/VesselSystemV2.js';
 import InputManagerV2 from './InputManagerV2.js';
 import HUD from '../ui/HUD_NEW.js';
 import AssetManager from './AssetManager.js';
+import MapGenerator from '../world/MapGenerator.js';
 import { COLORS } from '../data/Colors.js';
 import '../ui/HUD_NEW.css';
 
@@ -328,6 +329,21 @@ class Engine {
         // Create resource manager
         this.resourceManager = new ResourceManager(this.scene);
 
+        // WIRE ResourceManager production events to ProgressionManager
+        if (this.hud && this.hud.progressionManager) {
+            this.resourceManager.onProduced((resourceType, amount) => {
+                this.hud.progressionManager.onResourceProduced(resourceType, amount);
+            });
+            
+            this.resourceManager.onConsumed((resourceType, amount) => {
+                this.hud.progressionManager.onResourceConsumed(resourceType, amount);
+            });
+            
+            console.log('[Engine] ResourceManager wired to ProgressionManager for event streaming');
+        } else {
+            console.warn('[Engine] WARNING: Could not wire ResourceManager to ProgressionManager (missing references)');
+        }
+
         // Create transport system
         this.transportSystem = new TransportSystem(this.grid, this.resourceManager);
 
@@ -340,6 +356,33 @@ class Engine {
             this.resourceManager,
             this.transportSystem
         );
+        
+        // WIRE PlacementManager building placement events to ProgressionManager
+        if (this.hud && this.hud.progressionManager) {
+            this.placementManager.onPlaced((buildingId, buildingType, gridX, gridZ) => {
+                this.hud.progressionManager.onBuildingBuilt(buildingId);
+            });
+            
+            console.log('[Engine] PlacementManager wired to ProgressionManager for building events');
+        } else {
+            console.warn('[Engine] WARNING: Could not wire PlacementManager to ProgressionManager');
+        }
+        
+        // Initialize MapGenerator for procedural structure placement
+        try {
+            this.mapGenerator = new MapGenerator(this.grid, this.scene);
+            
+            // Wire progression manager to MapGenerator for unlock checks
+            if (this.hud && this.hud.progressionManager) {
+                this.mapGenerator.setProgressionManager(this.hud.progressionManager);
+            }
+            
+            // Generate the map with structures
+            const mapData = this.mapGenerator.generateMap();
+            console.log('[Engine] MapGenerator complete:', mapData.stats.totalStructures, 'structures placed');
+        } catch (e) {
+            console.error('[Engine] ERROR initializing MapGenerator:', e);
+        }
         
         // Store camera reference for LOD calculations in buildings
         this.scene.userData.camera = this.camera;

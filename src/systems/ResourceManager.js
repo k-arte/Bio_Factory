@@ -3,13 +3,21 @@ import BioDatabase from '../data/BioDatabase.js';
 
 /**
  * ResourceManager: Object pool pattern for creating, recycling, and managing 3D resource meshes
- * Handles creation and cleanup of resource graphics to avoid memory leaks
- * Now uses BioDatabase for resource properties and visual styling
+ * Now fully data-driven (reads from BioDatabase) and event-driven (emits production/consumption events)
+ * 
+ * Architecture:
+ * - getResource() = production event
+ * - releaseResource() = consumption event
+ * - Events wired to ProgressionManager for stat tracking
  */
 class ResourceManager {
     constructor(scene) {
         this.scene = scene;
         this.database = BioDatabase;
+        
+        // Event listeners (callbacks)
+        this.onResourceProduced = null;  // (resourceType, amount) -> void
+        this.onResourceConsumed = null;  // (resourceType, amount) -> void
         
         // Build resource config from database
         this.resourceConfigs = this._buildConfigFromDatabase();
@@ -19,8 +27,30 @@ class ResourceManager {
         this.activeResources = new Map(); // Track all active resources by ID
         this.resourceIdCounter = 0;
         
+        // Statistics tracking (for progression)
+        this.stats = {
+            totalProduced: {}, // resourceType -> count
+            totalConsumed: {}   // resourceType -> count
+        };
+        
         // Initialize pools for all resources
         this._initializePools();
+    }
+
+    /**
+     * Register a callback for resource production events
+     */
+    onProduced(callback) {
+        this.onResourceProduced = callback;
+        console.log('[ResourceManager] Registered onResourceProduced listener');
+    }
+
+    /**
+     * Register a callback for resource consumption events
+     */
+    onConsumed(callback) {
+        this.onResourceConsumed = callback;
+        console.log('[ResourceManager] Registered onResourceConsumed listener');
     }
 
     /**
@@ -161,6 +191,7 @@ class ResourceManager {
 
     /**
      * Get or create a resource mesh from the pool
+     * FIRES: onResourceProduced event
      */
     getResource(resourceType, position = { x: 0, y: 0, z: 0 }) {
         let mesh = null;
@@ -190,7 +221,18 @@ class ResourceManager {
             created: Date.now()
         });
 
-        console.log(`[ResourceManager] Created ${resourceType} #${resourceId}`);
+        // Track statistics
+        if (!this.stats.totalProduced[resourceType]) {
+            this.stats.totalProduced[resourceType] = 0;
+        }
+        this.stats.totalProduced[resourceType]++;
+
+        // Fire production event
+        if (this.onResourceProduced) {
+            this.onResourceProduced(resourceType, 1);
+        }
+
+        console.log(`[ResourceManager] Produced ${resourceType} #${resourceId}`);
         return {
             id: resourceId,
             type: resourceType,
@@ -201,6 +243,7 @@ class ResourceManager {
 
     /**
      * Return a resource to the pool
+     * FIRES: onResourceConsumed event
      */
     releaseResource(resource) {
         if (!resource || !resource.id) return;
@@ -214,6 +257,17 @@ class ResourceManager {
         const mesh = tracked.mesh;
         const resourceType = tracked.type;
 
+        // Track statistics
+        if (!this.stats.totalConsumed[resourceType]) {
+            this.stats.totalConsumed[resourceType] = 0;
+        }
+        this.stats.totalConsumed[resourceType]++;
+
+        // Fire consumption event
+        if (this.onResourceConsumed) {
+            this.onResourceConsumed(resourceType, 1);
+        }
+
         // Reset and hide
         mesh.visible = false;
         mesh.position.set(0, -100, 0); // Move far away
@@ -226,7 +280,7 @@ class ResourceManager {
         // Return to pool
         if (this.resourcePool[resourceType].length < 50) { // Limit pool size
             this.resourcePool[resourceType].push(mesh);
-            console.log(`[ResourceManager] Released ${resourceType} #${resource.id}`);
+            console.log(`[ResourceManager] Consumed ${resourceType} #${resource.id}`);
         } else {
             // Dispose if pool is full
             mesh.geometry.dispose();
