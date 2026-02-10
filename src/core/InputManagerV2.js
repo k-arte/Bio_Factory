@@ -113,6 +113,8 @@ class InputManagerV2 {
      * Handle mouse down for drag-to-place start
      */
     onCanvasMouseDown(event) {
+        // Note: Vessel trace mode operates independently of UI open/building selection
+        
         if (this.isUIOpen || !this.selectedBuildingType) return;
 
         const rect = this.renderer.domElement.getBoundingClientRect();
