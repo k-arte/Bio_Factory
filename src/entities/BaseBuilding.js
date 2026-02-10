@@ -224,6 +224,9 @@ class BaseBuilding {
         const wasStalled = this.isStalled;
         this.isStalled = this.currentATP > this.maxATP;
         
+        // Update visual indicator if stall state changed
+        this.updateStallOutlineVisibility();
+        
         // Return true if stall state changed
         return wasStalled !== this.isStalled;
     }
@@ -326,6 +329,40 @@ class BaseBuilding {
         this.scene.add(this.outlineMesh);
     }
 
+    /**
+     * Create yellow-orange stall indicator outline
+     * Shown when ATP > capacity (building is stalled)
+     */
+    createStallOutline(geometry) {
+        if (!this.mesh) return;
+
+        const stallGeometry = geometry.clone();
+        const stallMaterial = new THREE.MeshBasicMaterial({
+            color: 0xFFA500,  // Orange-yellow
+            side: THREE.BackSide,
+            wireframe: false,
+            transparent: true,
+            opacity: 0.6
+        });
+
+        this.stallOutline = new THREE.Mesh(stallGeometry, stallMaterial);
+        this.stallOutline.position.copy(this.mesh.position);
+        this.stallOutline.scale.set(1.06, 1.06, 1.06);  // Slightly larger than black outline
+        this.stallOutline.name = `StallOutline_${this.mesh.name || 'building'}`;
+        this.stallOutline.visible = false;  // Hidden by default
+
+        this.scene.add(this.stallOutline);
+    }
+
+    /**
+     * Update stall outline visibility based on isStalled state
+     */
+    updateStallOutlineVisibility() {
+        if (this.stallOutline) {
+            this.stallOutline.visible = this.isStalled;
+        }
+    }
+
     update(deltaTime) {
         // Override in subclasses
     }
@@ -386,6 +423,7 @@ class Extractor extends BaseBuilding {
         
         // Create black outline for toon effect
         this.createOutlineForMesh(geometry, 1.05);
+        this.createStallOutline(geometry);  // Yellow-orange for ATP stall
     }
 
     /**
@@ -469,6 +507,7 @@ class Storage extends BaseBuilding {
         
         // Create black outline for toon effect
         this.createOutlineForMesh(geometry, 1.04);
+        this.createStallOutline(geometry);  // Yellow-orange for ATP stall
     }
 
     /**
@@ -561,6 +600,7 @@ class CatabolismCell extends BaseBuilding {
         
         // Create black outline for toon effect
         this.createOutlineForMesh(geometry, 1.03);
+        this.createStallOutline(geometry);  // Yellow-orange for ATP stall
         
         console.log(`[CatabolismCell] Created at [${gridX}, ${gridZ}]`);
     }
@@ -650,6 +690,7 @@ class AnabolismCell extends BaseBuilding {
         
         // Create black outline for toon effect
         this.createOutlineForMesh(geometry, 1.03);
+        this.createStallOutline(geometry);  // Yellow-orange for ATP stall
         
         console.log(`[AnabolismCell] Created at [${gridX}, ${gridZ}]`);
     }
@@ -792,6 +833,9 @@ class Nucleus extends BaseBuilding {
         
         // Create outline mesh for toon effect
         this.createOutlineMesh(this.geometryLOD0, width, height, depth);
+        
+        // Create stall outline (yellow-orange for ATP overflow)
+        this.createStallOutline(this.geometryLOD0);
         
         // Add angeled light for shadows (top-left, casting to bottom-right)
         const light = new THREE.PointLight(0xFFFFFF, 0.8, 20);
