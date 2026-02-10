@@ -135,6 +135,22 @@ class InputManagerV2 {
      * Handle mouse up for drag-to-place end
      */
     onCanvasMouseUp(event) {
+        // Handle vessel trace mode (manual tracing with clicks)
+        if (this.vesselTraceMode && this.lastHoveredCell) {
+            const cell = { x: this.lastHoveredCell.x, z: this.lastHoveredCell.z };
+            
+            if (!this.traceStartCell) {
+                // First click: start the trace
+                this.startVesselTrace(cell);
+                console.log(`[InputManagerV2] Trace started at [${cell.x}, ${cell.z}]`);
+            } else {
+                // Second click: finish the trace and create vessels
+                this.finishVesselTrace(cell);
+                console.log(`[InputManagerV2] Trace finished at [${cell.x}, ${cell.z}]`);
+            }
+            return;
+        }
+        
         if (this.isDraggingBuilding) {
             this.isDraggingBuilding = false;
             if (this.vesselSystemV2) {
@@ -176,6 +192,11 @@ class InputManagerV2 {
             // Update ghost preview if building selected
             if (this.selectedBuildingType && !this.isDraggingBuilding) {
                 this.updateGhostPreview(gridPos.x, gridPos.z);
+            }
+
+            // Update vessel trace preview when tracing
+            if (this.vesselTraceMode && this.traceStartCell) {
+                this.updateVesselTracePreview(this.lastHoveredCell);
             }
 
             // For drag-to-place, update vessel hologram  
@@ -404,7 +425,30 @@ class InputManagerV2 {
         this.tracePath = this.computeManhattanPath(this.traceStartCell, gridCell);
         this.traceEndCell = gridCell;
         
-        // Update preview visualization (TODO: draw path preview in scene)
+        // Clear old preview meshes
+        this.clearVesselTracePreview();
+        
+        // Draw preview boxes along the path
+        const cellHeight = 1.0; // Match Grid.js cell size
+        const previewColor = 0x4169E1; // Royal blue for preview
+        const material = new THREE.MeshBasicMaterial({ 
+            color: previewColor, 
+            transparent: true, 
+            opacity: 0.3,
+            wireframe: false
+        });
+        
+        for (const cell of this.tracePath) {
+            const geometry = new THREE.BoxGeometry(0.8, 0.05, 0.8);
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.position.set(
+                cell.x + 0.5,
+                -cellHeight / 4, // 50% immersion
+                cell.z + 0.5
+            );
+            this.scene.add(mesh);
+            this.tracePreviewMeshes.push(mesh);
+        }
     }
 
     /**
@@ -417,13 +461,10 @@ class InputManagerV2 {
         this.tracePath = this.computeManhattanPath(this.traceStartCell, gridCell);
         
         // Create vessels along the path
-        if (this.placementManager && this.vesselSystemV2) {
-            for (let i = 0; i < this.tracePath.length; i++) {
-                const cell = this.tracePath[i];
-                const neighbors = this._getNeighbors(cell);
-                const vesselType = this._determineVesselType(neighbors, i, this.tracePath.length);
-                
-                this.vesselSystemV2.placeVessel(cell.x, cell.z, vesselType);
+        if (this.vesselSystemV2) {
+            for (const cell of this.tracePath) {
+                // placeVessel will automatically determine the type based on neighbors
+                this.vesselSystemV2.placeVessel(cell.x, cell.z);
             }
             
             console.log(`[InputManagerV2] ✓ Vessel path created (${this.tracePath.length} cells)`);
@@ -469,29 +510,6 @@ class InputManagerV2 {
         path.push({ x: end.x, z: end.z });
         
         return path;
-    }
-
-    /**
-     * Get neighbor connections for a cell based on trace path
-     */
-    _getNeighbors(cell) {
-        // This would need access to the grid to determine actual neighbors
-        // For now, return neighbors in the trace path
-        return {
-            xPos: false,  // +X
-            xNeg: false,  // -X
-            zPos: false,  // +Z
-            zNeg: false   // -Z
-        };
-    }
-
-    /**
-     * Determine vessel type based on position in path
-     */
-    _determineVesselType(neighbors, index, pathLength) {
-        // Simplified logic for now
-        if (index === 0 || index === pathLength - 1) return 'endcap';
-        return 'straight_x' || 'straight_z';
     }
 
     /**

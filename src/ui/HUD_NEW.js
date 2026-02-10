@@ -33,6 +33,7 @@ class HUD {
         this.settingsVisible = false;   // Settings panel toggle
         this.draftVisible = false;      // Draft panel toggle
         this.inventoryVisible = false;  // Inventory toggle
+        this.vesselModeActive = false;  // Vessel tracing mode
 
         // Initialize progression systems
         try {
@@ -134,6 +135,9 @@ class HUD {
         menu.className = 'hud-top-left-menu';
         
         menu.innerHTML = `
+            <button id="btn-vessel-mode" class="hud-btn hud-btn-menu" title="Vessel Tracing Mode [V]">
+                ⚓ VESSELS
+            </button>
             <button id="btn-settings" class="hud-btn hud-btn-menu" title="Settings">
                 ⚙ SETTINGS
             </button>
@@ -144,6 +148,7 @@ class HUD {
 
         document.body.appendChild(menu);
         
+        this.vesselModeBtn = menu.querySelector('#btn-vessel-mode');
         this.settingsBtn = menu.querySelector('#btn-settings');
         this.guideBtn = menu.querySelector('#btn-guide');
     }
@@ -1155,6 +1160,41 @@ class HUD {
                 this.toggleBuildings();
             });
             console.log('[HUD] Buildings button wired');
+        }
+
+        // VESSELS BUTTON
+        if (this.vesselModeBtn) {
+            this.vesselModeBtn.addEventListener('click', () => {
+                console.log('[HUD] Vessel mode button clicked, current state:', this.vesselModeActive);
+                this.vesselModeActive = !this.vesselModeActive;
+                
+                if (this.vesselModeActive) {
+                    console.log('[HUD] Entering vessel trace mode');
+                    // Highlight the vessel mode button to show it's active
+                    this.vesselModeBtn.style.backgroundColor = '#FFD700';
+                    this.vesselModeBtn.style.color = '#000';
+                    
+                    // Activate trace mode in input manager
+                    if (this.engine && this.engine.inputManager) {
+                        this.engine.inputManager.vesselTraceMode = true;
+                        console.log('[HUD] Input manager vessel trace mode activated');
+                    }
+                } else {
+                    console.log('[HUD] Exiting vessel trace mode');
+                    // Reset button style
+                    this.vesselModeBtn.style.backgroundColor = '';
+                    this.vesselModeBtn.style.color = '';
+                    
+                    // Deactivate trace mode and clean up
+                    if (this.engine && this.engine.inputManager) {
+                        this.engine.inputManager.endVesselTrace();
+                        console.log('[HUD] Input manager vessel trace mode deactivated');
+                    }
+                }
+            });
+            console.log('[HUD] Vessel mode button wired');
+        } else {
+            console.warn('[HUD] Vessel mode button not found! vesselModeBtn:', this.vesselModeBtn);
         }
         
         // GUIDE BUTTON
