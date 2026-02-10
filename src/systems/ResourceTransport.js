@@ -35,8 +35,23 @@ class ResourceTransport {
         this.packetSpeed = 0.5;           // Grid cells per second
         this.packetSize = 0.08;           // Visual size of resource packet
         
+        // Trail effect configuration
+        this.trailParticles = [];         // Array of trail particles
+        this.trailUpdateCounter = 0;      // Update trails every N frames
+        this.trailInterval = 5;           // Create trail particle every N frames
+        
         // Timers for packet generation
         this.extractorTimers = new Map(); // gridKey -> accumulatedTime
+        
+        // Statistics for efficiency monitoring
+        this.stats = {
+            totalPacketsCreated: 0,
+            totalPacketsDelivered: 0,
+            totalResourceDelivered: {},   // resourceType -> amount
+            lastMinutePackets: 0,
+            lastMinuteResources: {}
+        };
+        this.statsUpdateTimer = 0;
         
         console.log('[ResourceTransport] Initialized');
     }
@@ -142,6 +157,10 @@ class ResourceTransport {
                     this.scene.add(packet.mesh);
                     
                     this.activePackets.push(packet);
+                    
+                    // Update statistics
+                    this.stats.totalPacketsCreated++;
+                    
                     console.log(`[ResourceTransport] Created packet #${packet.id} (${packet.resourceType})`);
                 }
             }
@@ -200,6 +219,8 @@ class ResourceTransport {
      * Update positions of all active packets
      */
     _updatePackets(deltaTime) {
+        this.trailUpdateCounter++;
+        
         for (let i = this.activePackets.length - 1; i >= 0; i--) {
             const packet = this.activePackets[i];
             
@@ -232,7 +253,73 @@ class ResourceTransport {
                 if (packet.mesh) {
                     const worldPos = this.grid.getWorldPosition(packet.current.x, packet.current.z);
                     packet.mesh.position.set(worldPos.x, worldPos.y + 0.15, worldPos.z);
+                    
+                    // Create trail particles periodically
+                    if (this.trailUpdateCounter % this.trailInterval === 0) {
+                        this._createTrailParticle(packet);
+                    }
                 }
+            }
+        }
+        
+        // Update trail particles (fade and remove)
+        this._updateTrailParticles(deltaTime);
+    }
+
+    /**
+     * Create a trail particle behind a moving packet
+     */
+    _createTrailParticle(packet) {
+        const colorMap = {
+            'RES_ATP': 0xFFD54F,
+            'RES_GLUCOSE': 0x4CAF50,
+            'RES_OXYGEN': 0x64B5F6,
+            'RES_LACTATE': 0xFF7043,
+            'RES_AMINO_ACIDS': 0xFF69B4
+        };
+        
+        const color = colorMap[packet.resourceType] || 0xFFFFFF;
+        
+        // Create small sphere as trail particle (smaller than packet)
+        const geometry = new THREE.SphereGeometry(this.packetSize * 0.5, 6, 6);
+        const material = new THREE.MeshBasicMaterial({
+            color: color,
+            emissive: color,
+            emissiveIntensity: 0.3,
+            transparent: true,
+            opacity: 0.6
+        });
+        
+        const trail = new THREE.Mesh(geometry, material);
+        trail.position.copy(packet.mesh.position);
+        trail.userData.lifetime = 1.0; // Fade over 1 second
+        trail.userData.maxLifetime = 1.0;
+        
+        this.scene.add(trail);
+        this.trailParticles.push(trail);
+    }
+
+    /**
+     * Update trail particles (fade and remove)
+     */
+    _updateTrailParticles(deltaTime) {
+        for (let i = this.trailParticles.length - 1; i >= 0; i--) {
+            const trail = this.trailParticles[i];
+            trail.userData.lifetime -= deltaTime;
+            
+            if (trail.userData.lifetime <= 0) {
+                // Remove expired trail
+                this.scene.remove(trail);
+                trail.geometry.dispose();
+                trail.material.dispose();
+                this.trailParticles.splice(i, 1);
+            } else {
+                // Fade out as lifetime decreases
+                trail.material.opacity = 0.6 * (trail.userData.lifetime / trail.userData.maxLifetime);
+                
+                // Slightly scale down as it fades
+                const scale = trail.userData.lifetime / trail.userData.maxLifetime;
+                trail.scale.set(scale, scale, scale);
             }
         }
     }
@@ -252,7 +339,22 @@ class ResourceTransport {
                 // Transfer resource to storage building
                 if (storage.building && storage.building.receiveResource) {
                     storage.building.receiveResource(packet.resourceType, packet.amount);
-                    console.log(`[ResourceTransport] Deposited ${packet.amount} × ${packet.resourceType} at storage`);
+                    
+                    // Update statistics
+                    this.stats.totalPacketsDelivered++;
+                    this.stats.lastMinutePackets++;
+                    
+                    if (!this.stats.totalResourceDelivered[packet.resourceType]) {
+                        this.stats.totalResourceDelivered[packet.resourceType] = 0;
+                    }
+                    this.stats.totalResourceDelivered[packet.resourceType] += packet.amount;
+                    
+                    if (!this.stats.lastMinuteResources[packet.resourceType]) {
+                        this.stats.lastMinuteResources[packet.resourceType] = 0;
+                    }
+                    this.stats.lastMinuteResources[packet.resourceType] += packet.amount;
+                    
+                    console.log(`[ResourceTransport] ✓ Deposited ${packet.amount} × ${packet.resourceType} at storage`);
                 }
                 
                 // Mark for removal
@@ -307,11 +409,23 @@ class ResourceTransport {
     /**
      * Clear all packets (cleanup)
      */
+    /**
+     * Clear all packets and trails (cleanup)
+     */
     clear() {
         for (const packet of this.activePackets) {
             this._removePacket(packet);
         }
         this.activePackets = [];
+        
+        // Clean up trail particles
+        for (const trail of this.trailParticles) {
+            this.scene.remove(trail);
+            trail.geometry.dispose();
+            trail.material.dispose();
+        }
+        this.trailParticles = [];
+        
         this.extractors.clear();
         this.storages.clear();
         this.vessels.clear();
@@ -319,14 +433,39 @@ class ResourceTransport {
     }
 
     /**
+     * Reset per-minute statistics (call every 60 seconds)
+     */
+    resetMinuteStats() {
+        this.stats.lastMinutePackets = 0;
+        this.stats.lastMinuteResources = {};
+    }
+
+    /**
+     * Get statistics about active transport
+     */
+    /**
      * Get statistics about active transport
      */
     getStats() {
         return {
+            // Current state
             activePackets: this.activePackets.length,
+            activeTrails: this.trailParticles.length,
             registeredExtractors: this.extractors.size,
             registeredStorages: this.storages.size,
-            registeredVessels: this.vessels.size
+            registeredVessels: this.vessels.size,
+            
+            // Lifetime statistics
+            totalPacketsCreated: this.stats.totalPacketsCreated,
+            totalPacketsDelivered: this.stats.totalPacketsDelivered,
+            deliveryRate: this.stats.totalPacketsCreated > 0 
+                ? (this.stats.totalPacketsDelivered / this.stats.totalPacketsCreated * 100).toFixed(1) + '%'
+                : 'N/A',
+            
+            // Resource tracking
+            totalResourceDelivered: this.stats.totalResourceDelivered,
+            lastMinutePackets: this.stats.lastMinutePackets,
+            lastMinuteResources: this.stats.lastMinuteResources
         };
     }
 }
