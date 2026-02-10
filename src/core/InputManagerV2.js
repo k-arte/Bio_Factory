@@ -25,6 +25,13 @@ class InputManagerV2 {
         this.hotbar = null;
         this.inventory = null;
         
+        // Vessel tracing mode
+        this.vesselTraceMode = false;        // Active when tracing vessels
+        this.traceStartCell = null;          // Start cell {x, z}
+        this.traceEndCell = null;            // Current target cell
+        this.tracePath = [];                 // Path cells from start to end
+        this.tracePreviewMeshes = [];        // Preview meshes for path
+        
         // Building placement state
         this.ghostMesh = null;
         this.lastHoveredCell = { x: -1, z: -1 };
@@ -373,6 +380,130 @@ class InputManagerV2 {
      */
     getMouse() {
         return this.mouse;
+    }
+
+    /**
+     * Start vessel tracing from a building/vessel cell
+     */
+    startVesselTrace(gridCell) {
+        this.vesselTraceMode = true;
+        this.traceStartCell = gridCell;
+        this.traceEndCell = gridCell;
+        this.tracePath = [gridCell];
+        
+        console.log(`[InputManagerV2] Vessel trace started at [${gridCell.x}, ${gridCell.z}]`);
+    }
+
+    /**
+     * Update vessel trace preview (draw line as user moves mouse)
+     */
+    updateVesselTracePreview(gridCell) {
+        if (!this.vesselTraceMode || !this.traceStartCell) return;
+        
+        // Compute Manhattan path from start to current cell
+        this.tracePath = this.computeManhattanPath(this.traceStartCell, gridCell);
+        this.traceEndCell = gridCell;
+        
+        // Update preview visualization (TODO: draw path preview in scene)
+    }
+
+    /**
+     * Finish vessel tracing and create vessels
+     */
+    finishVesselTrace(gridCell) {
+        if (!this.vesselTraceMode || !this.traceStartCell) return;
+        
+        // Compute final path
+        this.tracePath = this.computeManhattanPath(this.traceStartCell, gridCell);
+        
+        // Create vessels along the path
+        if (this.placementManager && this.vesselSystemV2) {
+            for (let i = 0; i < this.tracePath.length; i++) {
+                const cell = this.tracePath[i];
+                const neighbors = this._getNeighbors(cell);
+                const vesselType = this._determineVesselType(neighbors, i, this.tracePath.length);
+                
+                this.vesselSystemV2.placeVessel(cell.x, cell.z, vesselType);
+            }
+            
+            console.log(`[InputManagerV2] ✓ Vessel path created (${this.tracePath.length} cells)`);
+        }
+        
+        // Reset trace mode
+        this.endVesselTrace();
+    }
+
+    /**
+     * Cancel vessel tracing
+     */
+    endVesselTrace() {
+        this.vesselTraceMode = false;
+        this.traceStartCell = null;
+        this.traceEndCell = null;
+        this.tracePath = [];
+        this.clearVesselTracePreview();
+    }
+
+    /**
+     * Compute Manhattan path from start to end (X first, then Z)
+     * @param {{x: number, z: number}} start - Start grid cell
+     * @param {{x: number, z: number}} end - End grid cell
+     * @returns {Array} Array of grid cells forming Manhattan path
+     */
+    computeManhattanPath(start, end) {
+        const path = [];
+        
+        // Go along X first
+        const xStep = Math.sign(end.x - start.x);
+        for (let x = start.x; x !== end.x; x += xStep) {
+            path.push({ x, z: start.z });
+        }
+        
+        // Then go along Z
+        const zStep = Math.sign(end.z - start.z);
+        for (let z = start.z; z !== end.z; z += zStep) {
+            path.push({ x: end.x, z });
+        }
+        
+        // Add end cell
+        path.push({ x: end.x, z: end.z });
+        
+        return path;
+    }
+
+    /**
+     * Get neighbor connections for a cell based on trace path
+     */
+    _getNeighbors(cell) {
+        // This would need access to the grid to determine actual neighbors
+        // For now, return neighbors in the trace path
+        return {
+            xPos: false,  // +X
+            xNeg: false,  // -X
+            zPos: false,  // +Z
+            zNeg: false   // -Z
+        };
+    }
+
+    /**
+     * Determine vessel type based on position in path
+     */
+    _determineVesselType(neighbors, index, pathLength) {
+        // Simplified logic for now
+        if (index === 0 || index === pathLength - 1) return 'endcap';
+        return 'straight_x' || 'straight_z';
+    }
+
+    /**
+     * Clear vessel trace preview meshes
+     */
+    clearVesselTracePreview() {
+        for (const mesh of this.tracePreviewMeshes) {
+            this.scene.remove(mesh);
+            mesh.geometry.dispose();
+            mesh.material.dispose();
+        }
+        this.tracePreviewMeshes = [];
     }
 }
 
