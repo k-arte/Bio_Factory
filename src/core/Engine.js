@@ -9,6 +9,7 @@ import InputManagerV2 from './InputManagerV2.js';
 import HUD from '../ui/HUD_NEW.js';
 import AssetManager from './AssetManager.js';
 import MapGenerator from '../world/MapGenerator.js';
+import DemoFactory from '../scenarios/DemoFactory.js';
 import { COLORS } from '../data/Colors.js';
 import '../ui/HUD_NEW.css';
 
@@ -150,6 +151,7 @@ class Engine {
         this.transportSystem = null;
         this.placementManager = null;
         this.vesselSystem = null; // Vessel/pipe management
+        this.demoFactory = null; // Demo scenario builder (initialized after placement manager setup)
         
         // Delta time tracking
         this.lastFrameTime = Date.now();
@@ -415,6 +417,15 @@ class Engine {
         if (this.inputManager) {
             this.inputManager.setPlacementManager(this.placementManager);
         }
+
+        // Initialize demo factory scenario builder
+        this.demoFactory = new DemoFactory(this);
+        console.log('[Engine] DemoFactory available via window.engine.demoFactory');
+        console.log('[Engine]   - demoFactory.setupQuick() : Quick setup (user places vessels)');
+        console.log('[Engine]   - demoFactory.setupFull() : Auto-setup with all vessels');
+        console.log('[Engine]   - demoFactory.setupMinimal() : Minimal single-path demo');
+        console.log('[Engine]   - demoFactory.setupStressTest() : 25-extractor stress test');
+        console.log('[Engine]   - demoFactory.printStats() : Status report');
 
         console.log('✓ Factory systems initialized');
         console.log(this.placementManager.getStats());
