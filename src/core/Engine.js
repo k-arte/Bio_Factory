@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import BioShader from '../shaders/BioShader.js';
 import ResourceManager from '../systems/ResourceManager.js';
+import ResourceTransport from '../systems/ResourceTransport.js';
 import TransportSystem from '../entities/TransportSystem.js';
 import PlacementManager from '../entities/PlacementManager.js';
 import VesselSystemV2 from '../entities/VesselSystemV2.js';
@@ -145,6 +146,7 @@ class Engine {
         
         // Factory systems
         this.resourceManager = null;
+        this.resourceTransport = null;  // Resource packet transport system
         this.transportSystem = null;
         this.placementManager = null;
         this.vesselSystem = null; // Vessel/pipe management
@@ -343,6 +345,9 @@ class Engine {
     initializeFactorySystems() {
         // Create resource manager
         this.resourceManager = new ResourceManager(this.scene);
+
+        // Create resource transport system (manages packet movement through vessels)
+        this.resourceTransport = new ResourceTransport(this.scene, this.grid, this.resourceManager);
 
         // WIRE ResourceManager production events to ProgressionManager
         if (this.hud && this.hud.progressionManager) {
@@ -1023,6 +1028,11 @@ class Engine {
         }
         if (this.resourceManager) {
             this.resourceManager.updateAll(time);
+        }
+        
+        // Update resource transport packets moving through vessels
+        if (this.resourceTransport) {
+            this.resourceTransport.update(this.deltaTime);
         }
         
         // Update vessel flow animations

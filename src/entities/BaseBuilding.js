@@ -205,6 +205,12 @@ class BaseBuilding {
         this.isStalled = false;       // True when ATP > capacity
         this.stallOutline = null;     // Visual indicator for stall (yellow-orange)
         
+        // Resource Transport System
+        this.resourceType = 'RES_ATP'; // Default resource produced (overridden by BioDatabase)
+        this.storedResources = {};     // { resourceType: amount }
+        this.resourceCapacity = 100;   // Max storable amount
+        this.isTransportBuilding = false; // Whether this building participates in (T/F) transport
+        
         // Create a visual indicator showing the grid cell this building occupies
         this._createCellIndicator();
     }
@@ -265,6 +271,74 @@ class BaseBuilding {
         this.maxATP = dbEntry.atp_capacity || 100;
         this.atpConsumption = dbEntry.atp_consumption_per_minute || 0;
         this.atpProduction = dbEntry.atp_production_per_minute || 0;
+        
+        // Set resource transport properties
+        if (dbEntry.outputs && dbEntry.outputs.length > 0) {
+            this.resourceType = dbEntry.outputs[0]; // Primary output resource
+            this.isTransportBuilding = true;
+        }
+        if (dbEntry.inputs && dbEntry.inputs.length > 0) {
+            this.isTransportBuilding = true; // Inputs suggest this participates in transport
+        }
+        
+        // Set capacity if specified
+        if (dbEntry.capacity) {
+            this.resourceCapacity = dbEntry.capacity[this.resourceType] || 100;
+        }
+    }
+
+    /**
+     * Receive a resource from the transport system
+     * Used by ResourceTransport packets to deposit resources
+     */
+    receiveResource(resourceType, amount) {
+        if (!this.isTransportBuilding) {
+            console.warn(`[BaseBuilding] Building at [${this.gridX},${this.gridZ}] cannot receive resources`);
+            return false;
+        }
+        
+        // Check if we can accept this resource type
+        if (this.resourceType && resourceType !== this.resourceType) {
+            // Only accept our primary resource type
+            return false;
+        }
+        
+        // Check capacity
+        const current = this.storedResources[resourceType] || 0;
+        if (current >= this.resourceCapacity) {
+            console.warn(`[BaseBuilding] Storage full at [${this.gridX},${this.gridZ}]`);
+            return false;
+        }
+        
+        // Store the resource
+        const remaining = this.resourceCapacity - current;
+        const stored = Math.min(amount, remaining);
+        
+        this.storedResources[resourceType] = current + stored;
+        console.log(`[BaseBuilding] Received ${stored} × ${resourceType}, total: ${this.storedResources[resourceType]}`);
+        
+        return stored > 0;
+    }
+
+    /**
+     * Get stored amount of a resource type
+     */
+    getStoredResource(resourceType) {
+        return this.storedResources[resourceType] || 0;
+    }
+
+    /**
+     * Check if this is an extractor/producer building
+     */
+    isProducer() {
+        return this.atpProduction > 0;
+    }
+
+    /**
+     * Check if this is a storage/consumer building
+     */
+    isStorage() {
+        return this.isTransportBuilding && !this.isProducer();
     }
     
     /**

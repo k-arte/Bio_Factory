@@ -61,6 +61,11 @@ class PlacementManager {
             building: extractor
         });
 
+        // Register with resource transport system
+        if (this.engine && this.engine.resourceTransport) {
+            this.engine.resourceTransport.registerExtractor(gridX, gridZ, extractor);
+        }
+
         // Fire building placement event
         if (this.onBuildingPlaced) {
             this.onBuildingPlaced('BLD_EXTRACTOR', this.buildingTypes.EXTRACTOR, gridX, gridZ);
@@ -96,6 +101,11 @@ class PlacementManager {
             type: this.buildingTypes.STORAGE,
             building: storage
         });
+
+        // Register with resource transport system
+        if (this.engine && this.engine.resourceTransport) {
+            this.engine.resourceTransport.registerStorage(gridX, gridZ, storage);
+        }
 
         // Fire building placement event
         if (this.onBuildingPlaced) {
@@ -163,6 +173,11 @@ class PlacementManager {
                 type: this.buildingTypes.VESSEL,
                 building: vessel
             });
+            
+            // Register vessel with resource transport system (for pathfinding)
+            if (this.engine && this.engine.resourceTransport) {
+                this.engine.resourceTransport.registerVessel(gridX, gridZ, vessel);
+            }
         }
 
         return vessel;
