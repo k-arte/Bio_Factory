@@ -4,6 +4,7 @@ import shaderProfileManager from '../core/ShaderProfileManager.js';
 import BioShader from '../shaders/BioShader.js';
 import { applyAnimationProfile } from '../shaders/AnimationProfile.js';
 import { COLORS } from '../data/Colors.js';
+import BioDatabase from '../data/BioDatabase.js';
 
 /**
  * Structure: Represents a functional unit within an organ
@@ -196,8 +197,71 @@ class BaseBuilding {
         const worldPos = grid.getWorldPosition(gridX, gridZ);
         this.position = worldPos.clone();
         
+        // ATP System (Energy lifecycle)
+        this.currentATP = 0;          // Current ATP stored
+        this.maxATP = 100;            // Capacity (overridden by BioDatabase)
+        this.atpConsumption = 0;      // ATP/min cost
+        this.atpProduction = 0;       // ATP/min output (only for generator buildings)
+        this.isStalled = false;       // True when ATP > capacity
+        this.stallOutline = null;     // Visual indicator for stall (yellow-orange)
+        
         // Create a visual indicator showing the grid cell this building occupies
         this._createCellIndicator();
+    }
+    
+    /**
+     * Update ATP state (call every frame or on resource update)
+     * Returns true if ATP changed from non-stalled to stalled (needs visual update)
+     */
+    updateATP(deltaTime = 1/60) {
+        const timeFactor = deltaTime; // seconds to minutes conversion
+        
+        // Apply consumption and production
+        const netChange = (this.atpProduction - this.atpConsumption) * timeFactor;
+        this.currentATP = Math.max(0, this.currentATP + netChange);
+        
+        // Check for overflow (stall condition)
+        const wasStalled = this.isStalled;
+        this.isStalled = this.currentATP > this.maxATP;
+        
+        // Return true if stall state changed
+        return wasStalled !== this.isStalled;
+    }
+
+    /**
+     * Get ATP normalized (0-1) for UI display
+     */
+    getATPRatio() {
+        return Math.max(0, Math.min(1, this.currentATP / this.maxATP));
+    }
+
+    /**
+     * Consume ATP (e.g., for building operations)
+     * Returns actual amount consumed
+     */
+    consumeATP(amount) {
+        const actually = Math.min(amount, this.currentATP);
+        this.currentATP -= actually;
+        return actually;
+    }
+
+    /**
+     * Produce ATP (from recipes or ambient)
+     */
+    produceATP(amount) {
+        this.currentATP += amount;
+        // Note: stall check happens in updateATP()
+    }
+
+    /**
+     * Set ATP capacity and load from BioDatabase config
+     */
+    loadFromBioDatabaseConfig(dbEntry) {
+        if (!dbEntry) return;
+        
+        this.maxATP = dbEntry.atp_capacity || 100;
+        this.atpConsumption = dbEntry.atp_consumption_per_minute || 0;
+        this.atpProduction = dbEntry.atp_production_per_minute || 0;
     }
     
     /**
@@ -300,6 +364,16 @@ class Extractor extends BaseBuilding {
         this.name = 'Pericyte Extractor';
         this.icon = '⚙️';
         
+        // Load ATP config from BioDatabase
+        const dbEntry = BioDatabase.buildings.find(b => b.id === this.bioId);
+        if (dbEntry) this.loadFromBioDatabaseConfig(dbEntry);
+        else {
+            // Fallback
+            this.maxATP = 100;
+            this.atpConsumption = 5;
+            this.atpProduction = 12;
+        }
+        
         // Generate resource every 2 seconds
         this.generationRate = 2.0;
         this.timeSinceLastGeneration = 0;
@@ -367,9 +441,19 @@ class Storage extends BaseBuilding {
         this.resourceManager = resourceManager;
         
         // Link to BioDatabase entry
-        this.bioId = 'BLD_STORAGE_DEPOT';
+        this.bioId = 'BLD_STORAGE_MICRO';
         this.name = 'Resource Storage';
         this.icon = '📦';
+        
+        // Load ATP config from BioDatabase
+        const dbEntry = BioDatabase.buildings.find(b => b.id === this.bioId);
+        if (dbEntry) this.loadFromBioDatabaseConfig(dbEntry);
+        else {
+            // Fallback
+            this.maxATP = 60;
+            this.atpConsumption = 2;
+            this.atpProduction = 0;
+        }
         
         this.inventory = {
             ION: 0,
@@ -451,8 +535,19 @@ class CatabolismCell extends BaseBuilding {
         this.isWorkerCell = true;
         this.specialization = 'CATABOLIC';
         
+        // Link to BioDatabase entry (may not exist yet, use fallback)
+        this.bioId = 'BLD_CATABOLISM_CELL';
+        const dbEntry = BioDatabase.buildings.find(b => b.id === this.bioId);
+        if (dbEntry) {
+            this.loadFromBioDatabaseConfig(dbEntry);
+        } else {
+            // Default for catabolic worker
+            this.maxATP = 100;
+            this.atpConsumption = 5;
+            this.atpProduction = 20;
+        }
+        
         // Production stats
-        this.atpProduction = 20; // ATP per cycle
         this.glucoseConsumption = 8;
         this.cycleTime = 3.0; // seconds per cycle
         this.timeSinceCycle = 0;
@@ -529,10 +624,20 @@ class AnabolismCell extends BaseBuilding {
         this.isWorkerCell = true;
         this.specialization = 'ANABOLIC';
         
+        // Link to BioDatabase entry
+        this.bioId = 'BLD_ANABOLIC_CELL';
+        const dbEntry = BioDatabase.buildings.find(b => b.id === this.bioId);
+        if (dbEntry) this.loadFromBioDatabaseConfig(dbEntry);
+        else {
+            // Fallback
+            this.maxATP = 100;
+            this.atpConsumption = 8;
+            this.atpProduction = 15;
+        }
+        
         // Production stats
         this.proteinProduction = 15; // Proteins per cycle
         this.aminoAcidConsumption = 12;
-        this.atpConsumption = 25;
         this.cycleTime = 4.0; // seconds per cycle
         this.timeSinceCycle = 0;
         this.cyclesCompleted = 0;
@@ -624,6 +729,16 @@ class Nucleus extends BaseBuilding {
         this.bioId = 'BLD_NUCLEUS_MAIN';
         this.name = 'Pluripotent Nucleus';
         this.icon = '🔴';
+        
+        // Load ATP config from BioDatabase
+        const dbEntry = BioDatabase.buildings.find(b => b.id === 'BLD_NUCLEUS_MAIN');
+        if (dbEntry) this.loadFromBioDatabaseConfig(dbEntry);
+        else {
+            // Fallback defaults for existing Nucleus (not in new BioDatabase yet)
+            this.maxATP = 100;
+            this.atpConsumption = 0;
+            this.atpProduction = 0;
+        }
         
         // Nucleus properties - spans 5x5 cells (decreased by 1 cell in radius)
         this.isMainBuilding = true;
