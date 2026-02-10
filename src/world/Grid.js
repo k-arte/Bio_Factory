@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { COLORS } from '../data/Colors.js';
 import shaderProfileManager from '../core/ShaderProfileManager.js';
+import ParticleSpawner from '../systems/ParticleSpawner.js';
 
 class Grid {
     constructor(scene) {
@@ -28,6 +29,12 @@ class Grid {
         // Create grid
         console.log('[Grid] Creating square grid...');
         this.createSquareGrid();
+        
+        // Spawn visual particles (calcium, amyloid)
+        console.log('[Grid] Spawning visual particles...');
+        this.particleSpawner = new ParticleSpawner(this.scene, this);
+        this.particleSpawner.spawnAllParticles();
+        this.gridGroup.add(this.particleSpawner.particleGroup);
         
         // Add to scene
         this.scene.add(this.gridGroup);

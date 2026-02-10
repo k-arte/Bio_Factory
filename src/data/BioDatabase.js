@@ -461,6 +461,36 @@ const BioDatabase = {
       default_head_gain: 1.0,
       leak_per_tile: 0.02
     }
+  },
+
+  particles: {
+    calcium: {
+      gridSize: 50,
+      clusterFrequency: 0.15,        // 15% of cells spawn clusters
+      baseSize: 0.3,                 // 30cm per particle unit
+      color: 0xD0D0D0,               // Light gray
+      emissive: 0x333333,
+      emissiveIntensity: 0.1,
+      // Size variants:
+      // - 1x1 (default): 100%
+      // - 2x2: ~1/5 chance
+      // - 3x3: ~1/25 chance
+      // Cluster size: 5 * random(1-4) = 5, 10, 15, or 20 particles
+      notes: "Calcium deposits (1×1 base, 2×2 & 3×3 rarer variants)"
+    },
+    amyloid: {
+      gridSize: 50,
+      spawnFrequency: 0.08,          // 8% of cells
+      plateWidth: 0.5,               // Default plate width
+      plateThickness: 0.05,          // Thin edge
+      colorPlate: 0xA08080,          // Brownish plate
+      emissivePlate: 0x1a1410,
+      emissivePlateIntensity: 0.05,
+      colorSpiral: 0x8B7355,         // Darker brown spiral
+      spiralRadius: 0.3,             // Helix radius
+      spiralTurns: 2,                // Number of spiral turns
+      notes: "Amyloid plates (wide flat OR tall narrow) + spiral decoration"
+    }
   }
 };
 
