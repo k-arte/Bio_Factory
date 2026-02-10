@@ -1363,6 +1363,12 @@ class HUD {
                 console.log('[HUD] G key pressed - toggling guide');
                 this.toggleGuide();
             }
+            if (e.key.toLowerCase() === 'v') {
+                console.log('[HUD] V key pressed - toggling vessel mode');
+                if (this.vesselModeBtn) {
+                    this.vesselModeBtn.click();
+                }
+            }
             // Delete key - clear selection or delete selected cells
             if (e.key === 'Delete' || e.key === 'Backspace') {
                 if (this.selectedRegion) {
