@@ -249,7 +249,13 @@ const BioDatabase = {
       tags: ["GENERATOR"],
       size: [1, 1],
       hp: 100,
-      supported_recipes: ["RECIPE_ATP_GLYCOLYSIS", "RECIPE_ATP_AEROBIC"]
+      supported_recipes: ["RECIPE_ATP_GLYCOLYSIS", "RECIPE_ATP_AEROBIC"],
+      atp_consumption_per_minute: 5,   // Energy cost per minute
+      atp_capacity: 100,                // Max ATP storage in cell
+      atp_production_per_minute: 12,    // Average ATP output
+      inputs: ["RES_GLUCOSE"],
+      outputs: ["RES_ATP"],
+      capacity: { "RES_ATP": 50 }
     },
     {
       id: "BLD_ANABOLIC_CELL",
@@ -259,7 +265,13 @@ const BioDatabase = {
       tags: ["GENERATOR"],
       size: [1, 1],
       hp: 100,
-      supported_recipes: ["RECIPE_ATP_GLYCOLYSIS", "RECIPE_ATP_AEROBIC"]
+      supported_recipes: ["RECIPE_ATP_GLYCOLYSIS", "RECIPE_ATP_AEROBIC"],
+      atp_consumption_per_minute: 8,
+      atp_capacity: 100,
+      atp_production_per_minute: 15,
+      inputs: ["RES_GLUCOSE"],
+      outputs: ["RES_ATP"],
+      capacity: { "RES_ATP": 60 }
     },
     {
       id: "BLD_SPONGE_CELL",
@@ -269,6 +281,9 @@ const BioDatabase = {
       tags: ["BALANCER"],
       size: [1, 1],
       hp: 100,
+      atp_consumption_per_minute: 3,
+      atp_capacity: 80,
+      atp_production_per_minute: 4,
       effects: { throughput: { in: 2, out: 2 } }
     },
     {
@@ -281,7 +296,10 @@ const BioDatabase = {
       hp: 120,
       radius_ft: 20,
       effect: { type: "DIFFUSE_ANY_RESOURCE" },
-      maintenance: { RES_GLUCOSE: 2 }
+      maintenance: { RES_GLUCOSE: 2 },
+      atp_consumption_per_minute: 10,
+      atp_capacity: 150,
+      atp_production_per_minute: 0
     },
     {
       id: "BLD_STORAGE_MICRO",
@@ -291,7 +309,13 @@ const BioDatabase = {
       tags: ["STORAGE"],
       size: [1, 1],
       hp: 80,
-      storage_capacity: 100
+      storage_capacity: 100,
+      atp_consumption_per_minute: 2,
+      atp_capacity: 60,
+      atp_production_per_minute: 0,
+      inputs: ["RES_GLUCOSE", "RES_OXYGEN"],
+      outputs: [],
+      capacity: { "RES_GLUCOSE": 50, "RES_OXYGEN": 30 }
     },
     {
       id: "BLD_VESSEL",
@@ -302,7 +326,10 @@ const BioDatabase = {
       size: [1, 1],
       hp: 60,
       throughput: 1.0,
-      auto_link: true
+      auto_link: true,
+      atp_consumption_per_minute: 1,
+      atp_capacity: 40,
+      atp_production_per_minute: 0
     },
     {
       id: "BLD_CARDIOCYTE_PUMP",
@@ -312,7 +339,10 @@ const BioDatabase = {
       tags: ["PUMP", "SYSTEM_STRUCTURE"],
       size: [2, 2],
       hp: 200,
-      unlock_condition: { type: "RESEARCH_COMPLETE", id: "TECH_LOGISTICS_NODES" }
+      unlock_condition: { type: "RESEARCH_COMPLETE", id: "TECH_LOGISTICS_NODES" },
+      atp_consumption_per_minute: 15,
+      atp_capacity: 200,
+      atp_production_per_minute: 0
     }
   ],
 
